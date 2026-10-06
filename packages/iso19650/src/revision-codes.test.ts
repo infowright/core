@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { checkRevisionForStatus, parseRevision } from './revision-codes';
+import { exampleRevision, parseRevision, type RevisionScheme } from './revision-codes';
 
-describe('parseRevision', () => {
+describe('parseRevision (UK National Annex)', () => {
   it('parses work in progress revisions with a version', () => {
     expect(parseRevision('P01.03')).toEqual({
       raw: 'P01.03',
@@ -23,43 +23,27 @@ describe('parseRevision', () => {
   });
 });
 
-describe('checkRevisionForStatus', () => {
-  it('accepts valid pairs', () => {
-    expect(checkRevisionForStatus('P01.01', 'S0')).toEqual([]);
-    expect(checkRevisionForStatus('P03', 'S2')).toEqual([]);
-    expect(checkRevisionForStatus('P02', 'B1')).toEqual([]);
-    expect(checkRevisionForStatus('C01', 'A1')).toEqual([]);
-    expect(checkRevisionForStatus('C04', 'CR')).toEqual([]);
+describe('parseRevision (custom scheme)', () => {
+  const scheme: RevisionScheme = {
+    preliminaryPrefix: 'T',
+    contractualPrefix: 'R',
+    digits: 1,
+    wipVersions: false,
+    versionSeparator: '.',
+    versionDigits: 2,
+  };
+
+  it('follows the project scheme', () => {
+    expect(parseRevision('T3', scheme)).toEqual({ raw: 'T3', type: 'preliminary', revision: 3 });
+    expect(parseRevision('R1', scheme)).toEqual({ raw: 'R1', type: 'contractual', revision: 1 });
   });
 
-  it('requires a version in work in progress', () => {
-    const problems = checkRevisionForStatus('P01', 'S0');
-    expect(problems).toHaveLength(1);
-    expect(problems[0]).toContain('P01.01');
+  it('rejects codes from other schemes', () => {
+    expect(parseRevision('P01', scheme)).toBeUndefined();
+    expect(parseRevision('T3.01', scheme)).toBeUndefined();
   });
 
-  it('does not allow versions outside work in progress', () => {
-    const problems = checkRevisionForStatus('P01.02', 'S3');
-    expect(problems).toHaveLength(1);
-    expect(problems[0]).toContain('only used in work in progress');
-  });
-
-  it('requires contractual revisions for A codes and CR', () => {
-    expect(checkRevisionForStatus('P01', 'A2')[0]).toContain('contractual');
-    expect(checkRevisionForStatus('P05', 'CR')[0]).toContain('contractual');
-  });
-
-  it('requires preliminary revisions for shared and B codes', () => {
-    expect(checkRevisionForStatus('C01', 'S2')[0]).toContain('preliminary');
-    expect(checkRevisionForStatus('C01', 'B1')[0]).toContain('preliminary');
-  });
-
-  it('flags the withdrawn S5 code', () => {
-    expect(checkRevisionForStatus('P01', 'S5')[0]).toContain('withdrawn');
-  });
-
-  it('reports unknown status codes and invalid revisions together', () => {
-    const problems = checkRevisionForStatus('P1', 'S9');
-    expect(problems).toHaveLength(2);
+  it('builds examples in the scheme', () => {
+    expect(exampleRevision(scheme, 'contractual')).toBe('R1');
   });
 });

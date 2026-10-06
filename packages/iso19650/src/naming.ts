@@ -150,13 +150,14 @@ export function validateContainerName(
   fields.forEach((field, i) => {
     const value = parts[i] ?? '';
     values[field.key] = value;
-    problems.push(...checkField(field, value));
+    problems.push(...validateNamingField(field, value));
   });
 
   return { valid: problems.length === 0, values, problems };
 }
 
-function checkField(field: NamingField, value: string): NamingProblem[] {
+/** Checks a single field value, e.g. a project code against the Project field. */
+export function validateNamingField(field: NamingField, value: string): NamingProblem[] {
   const problems: NamingProblem[] = [];
   const at = (message: string) => problems.push({ field: field.key, message });
 

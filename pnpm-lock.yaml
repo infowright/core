@@ -188,13 +188,36 @@ importers:
         specifier: 5.0.3
         version: 5.0.3(@types/node@24.19.1)(vite@8.3.2(@types/node@24.19.1))
 
+  packages/common: {}
+
   packages/delivery-plan:
     dependencies:
+      '@infowright/common':
+        specifier: workspace:*
+        version: link:../common
+      '@infowright/iso19650':
+        specifier: workspace:*
+        version: link:../iso19650
+      '@infowright/schedule':
+        specifier: workspace:*
+        version: link:../schedule
+
+  packages/iso19650: {}
+
+  packages/project:
+    dependencies:
+      '@infowright/common':
+        specifier: workspace:*
+        version: link:../common
       '@infowright/iso19650':
         specifier: workspace:*
         version: link:../iso19650
 
-  packages/iso19650: {}
+  packages/schedule:
+    dependencies:
+      '@infowright/common':
+        specifier: workspace:*
+        version: link:../common
 
 packages:
 

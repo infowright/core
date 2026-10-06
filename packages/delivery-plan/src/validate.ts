@@ -1,4 +1,11 @@
-import { getStatusCode, validateContainerName, type NamingConvention } from '@infowright/iso19650';
+import { isIsoDate } from '@infowright/common';
+import {
+  getStatusCode,
+  UK_NATIONAL_ANNEX,
+  validateContainerName,
+  type InformationStandard,
+} from '@infowright/iso19650';
+import { findActivity, type Schedule } from '@infowright/schedule';
 import type { Deliverable, DeliveryPlan, PlannedIssue } from './types';
 
 export interface PlanProblem {
@@ -8,20 +15,26 @@ export interface PlanProblem {
 }
 
 export interface ValidateOptions {
-  /** When set, planned container names are checked against this convention. */
-  namingConvention?: NamingConvention;
+  /** The project's information standard. Defaults to the UK National Annex. */
+  standard?: InformationStandard;
+  /** When set, linked programme activities must exist in it. */
+  schedule?: Schedule;
 }
 
-/** True for a real calendar date written as YYYY-MM-DD. */
-export function isIsoDate(value: string): boolean {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
-  const date = new Date(`${value}T00:00:00Z`);
-  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
-}
-
-/** The date an issue is due: its own date if set, otherwise the milestone date. */
-export function resolveDueDate(issue: PlannedIssue, plan: DeliveryPlan): string | undefined {
+/**
+ * The date an issue is due, in order of preference:
+ * its own due date, the finish of its programme activity, then the milestone date.
+ */
+export function resolveDueDate(
+  issue: PlannedIssue,
+  plan: DeliveryPlan,
+  schedule?: Schedule,
+): string | undefined {
   if (issue.due) return issue.due;
+  if (schedule && issue.activityId) {
+    const finish = findActivity(schedule, issue.activityId)?.finish;
+    if (finish) return finish;
+  }
   return plan.milestones.find((m) => m.id === issue.milestoneId)?.date;
 }
 
@@ -38,6 +51,7 @@ export function validateDeliveryPlan(
   options: ValidateOptions = {},
 ): PlanProblem[] {
   const problems: PlanProblem[] = [];
+  const standard = options.standard ?? UK_NATIONAL_ANNEX;
 
   const milestoneIds = new Set<string>();
   for (const m of plan.milestones) {
@@ -85,10 +99,8 @@ export function validateDeliveryPlan(
       } else {
         seenNames.set(d.containerName, d.id);
       }
-      if (options.namingConvention) {
-        for (const p of validateContainerName(d.containerName, options.namingConvention).problems) {
-          at(`${d.containerName}: ${p.message}`);
-        }
+      for (const p of validateContainerName(d.containerName, standard.naming).problems) {
+        at(`${d.containerName}: ${p.message}`);
       }
     }
 
@@ -110,7 +122,7 @@ export function validateDeliveryPlan(
       }
       issueMilestones.add(mid);
 
-      const status = getStatusCode(issue.status);
+      const status = getStatusCode(issue.status, standard.statusCodes);
       if (!status) {
         at(`"${name}" has an unknown target status "${issue.status}" for "${mid}".`, mid);
       } else if (status.withdrawn) {
@@ -118,6 +130,17 @@ export function validateDeliveryPlan(
       } else if (status.state === 'wip') {
         at(
           `"${name}" targets ${issue.status} for "${mid}", but work in progress is never a delivery. Use a shared or published status.`,
+          mid,
+        );
+      }
+
+      if (
+        options.schedule &&
+        issue.activityId &&
+        !findActivity(options.schedule, issue.activityId)
+      ) {
+        at(
+          `"${name}" is linked to activity ${issue.activityId}, which is not in the programme.`,
           mid,
         );
       }

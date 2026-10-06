@@ -9,6 +9,8 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
-    "@infowright/iso19650": "workspace:*"
+    "@infowright/common": "workspace:*",
+    "@infowright/iso19650": "workspace:*",
+    "@infowright/schedule": "workspace:*"
   }
 }

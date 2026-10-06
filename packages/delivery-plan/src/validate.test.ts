@@ -1,7 +1,27 @@
-import { UK_NA_NAMING_CONVENTION } from '@infowright/iso19650';
+import { UK_NATIONAL_ANNEX, type InformationStandard } from '@infowright/iso19650';
+import type { Schedule } from '@infowright/schedule';
 import { describe, expect, it } from 'vitest';
 import type { DeliveryPlan } from './types';
-import { isIsoDate, resolveDueDate, validateDeliveryPlan } from './validate';
+import { resolveDueDate, validateDeliveryPlan } from './validate';
+
+const schedule: Schedule = {
+  activities: [
+    {
+      id: 'DES-1040',
+      name: 'Developed design',
+      finish: '2027-09-20',
+      startActual: false,
+      finishActual: false,
+    },
+    {
+      id: 'DES-1060',
+      name: 'Calculations',
+      finish: '2027-08-15',
+      startActual: false,
+      finishActual: false,
+    },
+  ],
+};
 
 function samplePlan(): DeliveryPlan {
   return {
@@ -36,16 +56,39 @@ describe('validateDeliveryPlan', () => {
     expect(validateDeliveryPlan(samplePlan())).toEqual([]);
   });
 
-  it('accepts container names that match the naming convention', () => {
-    expect(
-      validateDeliveryPlan(samplePlan(), { namingConvention: UK_NA_NAMING_CONVENTION }),
-    ).toEqual([]);
+  it('accepts a valid plan linked to the programme', () => {
+    expect(validateDeliveryPlan(samplePlan(), { schedule })).toEqual([]);
+  });
+
+  it('reports links to activities missing from the programme', () => {
+    const plan = samplePlan();
+    plan.deliverables[1]!.issues[0]!.activityId = 'DES-9999';
+    expect(validateDeliveryPlan(plan, { schedule })[0]?.message).toBe(
+      '"Structural calculations" is linked to activity DES-9999, which is not in the programme.',
+    );
+  });
+
+  it('uses the project standard for names and status codes', () => {
+    const project: InformationStandard = {
+      ...UK_NATIONAL_ANNEX,
+      statusCodes: [
+        { code: 'WIP', description: 'Work in progress', state: 'wip', revisionType: 'preliminary' },
+        { code: 'FC', description: 'For comment', state: 'shared', revisionType: 'preliminary' },
+      ],
+    };
+    const plan = samplePlan();
+    plan.deliverables[0]!.issues = [{ milestoneId: 'G2', status: 'FC' }];
+    plan.deliverables[1]!.issues = [{ milestoneId: 'G3', status: 'S4' }];
+    const messages = validateDeliveryPlan(plan, { standard: project }).map((p) => p.message);
+    expect(messages).toEqual([
+      '"Structural calculations" has an unknown target status "S4" for "G3".',
+    ]);
   });
 
   it('reports container names that break the naming convention', () => {
     const plan = samplePlan();
     plan.deliverables[0]!.containerName = 'DEMO-ACME-ZZ-00-DR-A-01';
-    const problems = validateDeliveryPlan(plan, { namingConvention: UK_NA_NAMING_CONVENTION });
+    const problems = validateDeliveryPlan(plan);
     expect(problems).toHaveLength(1);
     expect(problems[0]?.message).toContain('expected 4 to 6');
   });
@@ -139,16 +182,15 @@ describe('resolveDueDate', () => {
     expect(resolveDueDate(second!, plan)).toBe('2027-09-15');
   });
 
+  it('takes the programme activity finish before the milestone date', () => {
+    const plan = samplePlan();
+    const issue = { milestoneId: 'G3', status: 'S4', activityId: 'DES-1060' };
+    expect(resolveDueDate(issue, plan, schedule)).toBe('2027-08-15');
+    expect(resolveDueDate({ ...issue, due: '2027-08-01' }, plan, schedule)).toBe('2027-08-01');
+    expect(resolveDueDate({ ...issue, activityId: 'NONE' }, plan, schedule)).toBe('2027-09-30');
+  });
+
   it('returns undefined for an unknown milestone without its own date', () => {
     expect(resolveDueDate({ milestoneId: 'X', status: 'S2' }, samplePlan())).toBeUndefined();
-  });
-});
-
-describe('isIsoDate', () => {
-  it('accepts real dates only', () => {
-    expect(isIsoDate('2028-02-29')).toBe(true);
-    expect(isIsoDate('2027-02-29')).toBe(false);
-    expect(isIsoDate('2027-13-01')).toBe(false);
-    expect(isIsoDate('2027-1-01')).toBe(false);
   });
 });

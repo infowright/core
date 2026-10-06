@@ -8,12 +8,19 @@ export {
 export {
   getStatusCode,
   isUsableStatusCode,
-  UK_NA_FIXED_STATUS_CODES,
+  UK_NA_STATUS_CODES,
   type RevisionType,
   type StatusCode,
+  type StatusCodeDefinition,
 } from './status-codes';
 
-export { checkRevisionForStatus, parseRevision, type Revision } from './revision-codes';
+export {
+  exampleRevision,
+  parseRevision,
+  UK_NA_REVISION_SCHEME,
+  type Revision,
+  type RevisionScheme,
+} from './revision-codes';
 
 export {
   describeConvention,
@@ -21,8 +28,16 @@ export {
   UK_NA_ROLE_CODES,
   UK_NA_TYPE_CODES,
   validateContainerName,
+  validateNamingField,
   type NamingConvention,
   type NamingField,
   type NamingProblem,
   type NamingResult,
 } from './naming';
+
+export {
+  checkRevisionForStatus,
+  UK_NATIONAL_ANNEX,
+  validateStandard,
+  type InformationStandard,
+} from './standard';

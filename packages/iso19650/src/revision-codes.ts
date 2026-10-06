@@ -1,4 +1,30 @@
-import { getStatusCode, type RevisionType } from './status-codes';
+import type { RevisionType } from './status-codes';
+
+/** How a project writes revision codes. Plain data, so it can be stored and edited. */
+export interface RevisionScheme {
+  /** Prefix for preliminary (non-contractual) revisions, e.g. "P". */
+  preliminaryPrefix: string;
+  /** Prefix for contractual revisions, e.g. "C". */
+  contractualPrefix: string;
+  /** Number of digits in the revision number, e.g. 2 for P01. */
+  digits: number;
+  /** True when work in progress carries a version, e.g. P01.03. */
+  wipVersions: boolean;
+  /** Separator between revision and version, e.g. ".". */
+  versionSeparator: string;
+  /** Number of digits in the version, e.g. 2 for .03. */
+  versionDigits: number;
+}
+
+/** Revision codes from the UK National Annex: P01.01 in WIP, P01 preliminary, C01 contractual. */
+export const UK_NA_REVISION_SCHEME: RevisionScheme = {
+  preliminaryPrefix: 'P',
+  contractualPrefix: 'C',
+  digits: 2,
+  wipVersions: true,
+  versionSeparator: '.',
+  versionDigits: 2,
+};
 
 export interface Revision {
   raw: string;
@@ -9,14 +35,34 @@ export interface Revision {
   version?: number;
 }
 
-const REVISION_PATTERN = /^([PC])(\d{2})(?:\.(\d{2}))?$/;
+const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/** Builds an example code in the scheme, e.g. "P01" or "P01.01". */
+export function exampleRevision(
+  scheme: RevisionScheme,
+  type: RevisionType,
+  withVersion = false,
+): string {
+  const prefix = type === 'contractual' ? scheme.contractualPrefix : scheme.preliminaryPrefix;
+  const base = prefix + '1'.padStart(scheme.digits, '0');
+  return withVersion
+    ? base + scheme.versionSeparator + '1'.padStart(scheme.versionDigits, '0')
+    : base;
+}
 
 /**
- * Parses a revision code such as P01.01 (work in progress), P01 (shared) or C01 (published).
- * Returns undefined when the code does not follow the pattern.
+ * Parses a revision code using a project's scheme (UK National Annex by default).
+ * Returns undefined when the code does not follow the scheme.
  */
-export function parseRevision(code: string): Revision | undefined {
-  const match = REVISION_PATTERN.exec(code);
+export function parseRevision(
+  code: string,
+  scheme: RevisionScheme = UK_NA_REVISION_SCHEME,
+): Revision | undefined {
+  const prefixes = [scheme.preliminaryPrefix, scheme.contractualPrefix].map(escape).join('|');
+  const version = scheme.wipVersions
+    ? `(?:${escape(scheme.versionSeparator)}(\\d{${scheme.versionDigits}}))?`
+    : '';
+  const match = new RegExp(`^(${prefixes})(\\d{${scheme.digits}})${version}$`).exec(code);
   if (!match) return undefined;
 
   const [, prefix, rev, ver] = match;
@@ -25,70 +71,13 @@ export function parseRevision(code: string): Revision | undefined {
 
   const parsed: Revision = {
     raw: code,
-    type: prefix === 'C' ? 'contractual' : 'preliminary',
+    type: prefix === scheme.contractualPrefix ? 'contractual' : 'preliminary',
     revision,
   };
   if (ver !== undefined) {
-    const version = Number(ver);
-    if (version === 0) return undefined;
-    parsed.version = version;
+    const v = Number(ver);
+    if (v === 0) return undefined;
+    parsed.version = v;
   }
   return parsed;
-}
-
-/**
- * Checks that a revision code fits the status code it is issued with.
- * Returns a list of problems in plain language. An empty list means the pair is valid.
- */
-export function checkRevisionForStatus(revisionCode: string, statusCode: string): string[] {
-  const problems: string[] = [];
-  const status = getStatusCode(statusCode);
-  const revision = parseRevision(revisionCode);
-
-  if (!status) {
-    problems.push(`"${statusCode}" is not a recognised status code.`);
-  } else if (status.withdrawn) {
-    problems.push(`Status code ${statusCode} has been withdrawn and should not be used.`);
-  }
-
-  if (!revision) {
-    problems.push(
-      `"${revisionCode}" is not a valid revision. Expected P01.01 in work in progress, P01 for preliminary or C01 for contractual issues.`,
-    );
-  }
-
-  if (!status || !revision) return problems;
-
-  if (status.state === 'wip') {
-    if (revision.type !== 'preliminary') {
-      problems.push(
-        `Work in progress (${statusCode}) must use a preliminary revision starting with P.`,
-      );
-    }
-    if (revision.version === undefined) {
-      problems.push(
-        `Work in progress (${statusCode}) needs a version after the revision, e.g. P01.01 instead of ${revisionCode}.`,
-      );
-    }
-    return problems;
-  }
-
-  if (revision.version !== undefined) {
-    problems.push(
-      `Versions like .${String(revision.version).padStart(2, '0')} are only used in work in progress. Use P${String(revision.revision).padStart(2, '0')} or C${String(revision.revision).padStart(2, '0')} for ${statusCode}.`,
-    );
-  }
-
-  if (status.revisionType === 'contractual' && revision.type !== 'contractual') {
-    problems.push(
-      `Status code ${statusCode} requires a contractual revision starting with C, e.g. C01.`,
-    );
-  }
-  if (status.revisionType === 'preliminary' && revision.type !== 'preliminary') {
-    problems.push(
-      `Status code ${statusCode} requires a preliminary revision starting with P, e.g. P01.`,
-    );
-  }
-
-  return problems;
 }

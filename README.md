@@ -6,24 +6,37 @@ Infowright Core is the open part of [Infowright](https://github.com/infowright) 
 
 > **Status:** early development. APIs may still change.
 
-## Modules
+## Packages
 
-| Package                         | Purpose                                                                                                                                                                                   | Status  |
-| ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
-| **`@infowright/iso19650`**      | Container states, status codes (UK National Annex: S0-S7, A1..An, B1..Bn, CR), revision codes (P01.01, P01, C01) and naming conventions with a validator that explains _why_ a name fails | Done    |
-| **`@infowright/delivery-plan`** | MIDP / TIDP data model: milestones, deliverables, what is due at each milestone, links to programme activities. Validation in plain language                                              | Done    |
-| **Schedule parsers**            | Readers for Primavera P6 (XER), Microsoft Project (XML) and Excel schedules                                                                                                               | Planned |
+| Package                         | Purpose                                                                                                                                                                                        |
+| ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **`@infowright/iso19650`**      | Container states, status codes, revision codes and naming conventions. Every project defines its own **information standard**; the UK National Annex is a ready-made preset to copy and adjust |
+| **`@infowright/project`**       | Project record (code, name, type, client, location, budget, dates, status) with its own copy of the information standard                                                                       |
+| **`@infowright/delivery-plan`** | MIDP / TIDP: milestones, deliverables and what is due at each milestone, validated against the project standard                                                                                |
+| **`@infowright/schedule`**      | Reads programme exports from Excel (Primavera P6, Microsoft Project or a plain sheet), including P6 date formats and actual markers                                                            |
+| **`@infowright/common`**        | Small shared helpers (dates)                                                                                                                                                                   |
 
 ## Example
 
 ```ts
+import { createProject } from '@infowright/project';
 import { checkRevisionForStatus, validateContainerName } from '@infowright/iso19650';
 
-validateContainerName('PRJ-ORG-ZZ-01-DR-S-001').problems;
+// A project starts from the UK National Annex and can then change anything:
+// naming fields, status codes, revision format.
+const project = createProject({ id: 'p1', code: 'DEMO', name: 'Demo hospital' });
+project.standard.statusCodes.push({
+  code: 'IFC',
+  description: 'Issued for construction',
+  state: 'published',
+  revisionType: 'contractual',
+});
+
+validateContainerName('DEMO-ACME-ZZ-01-DR-S-001', project.standard.naming).problems;
 // [{ field: 'number', message: 'Number "001" has 3 characters; expected 4 to 6.' }]
 
-checkRevisionForStatus('P02', 'A1');
-// ['Status code A1 requires a contractual revision starting with C, e.g. C01.']
+checkRevisionForStatus('P02', 'IFC', project.standard);
+// ['Status code IFC requires a contractual revision, e.g. C01.']
 ```
 
 ## Principles

@@ -8,12 +8,11 @@ Infowright Core is the open part of [Infowright](https://github.com/infowright) 
 
 ## Modules
 
-| Module                   | Purpose                                                                                                             | Status  |
-| ------------------------ | ------------------------------------------------------------------------------------------------------------------- | ------- |
-| **ISO 19650 codes**      | Container states, status codes (UK National Annex: S0-S7, A1..An, B1..Bn, CR) and revision codes (P01.01, P01, C01) | Done    |
-| **Naming conventions**   | Configurable naming conventions with a UK National Annex preset and a validator that explains _why_ a name fails    | Done    |
-| **Delivery plan schema** | A common data model for MIDP / TIDP / responsibility matrix                                                         | Planned |
-| **Schedule parsers**     | Readers for Primavera P6 (XER), Microsoft Project (XML) and Excel schedules                                         | Planned |
+| Package                         | Purpose                                                                                                                                                                                   | Status  |
+| ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
+| **`@infowright/iso19650`**      | Container states, status codes (UK National Annex: S0-S7, A1..An, B1..Bn, CR), revision codes (P01.01, P01, C01) and naming conventions with a validator that explains _why_ a name fails | Done    |
+| **`@infowright/delivery-plan`** | MIDP / TIDP data model: milestones, deliverables, what is due at each milestone, links to programme activities. Validation in plain language                                              | Done    |
+| **Schedule parsers**            | Readers for Primavera P6 (XER), Microsoft Project (XML) and Excel schedules                                                                                                               | Planned |
 
 ## Example
 

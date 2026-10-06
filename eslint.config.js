@@ -7,4 +7,10 @@ export default tseslint.config(
   },
   js.configs.recommended,
   ...tseslint.configs.strict,
+  {
+    files: ['**/*.test.ts'],
+    rules: {
+      '@typescript-eslint/no-non-null-assertion': 'off',
+    },
+  },
 );

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { validateContainerName } from './naming';
 import {
+  checkName,
   checkRevisionForStatus,
   UK_NATIONAL_ANNEX,
   validateStandard,
@@ -56,29 +57,31 @@ describe('checkRevisionForStatus (UK National Annex)', () => {
 describe('a project with its own standard', () => {
   const project: InformationStandard = {
     name: 'Example project',
-    naming: {
-      name: 'Example project',
-      delimiter: '_',
-      fields: [
-        {
-          key: 'originator',
-          label: 'Originator',
-          minLength: 3,
-          maxLength: 3,
-          charset: 'alphanumeric',
-        },
-        { key: 'project', label: 'Project', minLength: 3, maxLength: 3, charset: 'alphanumeric' },
-        {
-          key: 'type',
-          label: 'Document type',
-          minLength: 3,
-          maxLength: 3,
-          charset: 'alphanumeric',
-          allowedCodes: { PLN: 'Plan', REP: 'Report', DWG: 'Drawing' },
-        },
-        { key: 'number', label: 'Number', minLength: 6, maxLength: 6, charset: 'numeric' },
-      ],
-    },
+    namingConventions: [
+      {
+        name: 'Example project',
+        delimiter: '_',
+        fields: [
+          {
+            key: 'originator',
+            label: 'Originator',
+            minLength: 3,
+            maxLength: 3,
+            charset: 'alphanumeric',
+          },
+          { key: 'project', label: 'Project', minLength: 3, maxLength: 3, charset: 'alphanumeric' },
+          {
+            key: 'type',
+            label: 'Document type',
+            minLength: 3,
+            maxLength: 3,
+            charset: 'alphanumeric',
+            allowedCodes: { PLN: 'Plan', REP: 'Report', DWG: 'Drawing' },
+          },
+          { key: 'number', label: 'Number', minLength: 6, maxLength: 6, charset: 'numeric' },
+        ],
+      },
+    ],
     statusCodes: [
       { code: 'WIP', description: 'Work in progress', state: 'wip', revisionType: 'preliminary' },
       { code: 'FC', description: 'For comment', state: 'shared', revisionType: 'preliminary' },
@@ -103,9 +106,17 @@ describe('a project with its own standard', () => {
     expect(validateStandard(project)).toEqual([]);
   });
 
+  it('checks names against its own variants', () => {
+    expect(checkName('ABC_XYZ_PLN_000003', project)?.result.valid).toBe(true);
+  });
+
   it('validates names with its own convention', () => {
-    expect(validateContainerName('ABC_XYZ_PLN_000003', project.naming).valid).toBe(true);
-    expect(validateContainerName('ABC-XYZ-PLN-000003', project.naming).valid).toBe(false);
+    expect(validateContainerName('ABC_XYZ_PLN_000003', project.namingConventions[0]).valid).toBe(
+      true,
+    );
+    expect(validateContainerName('ABC-XYZ-PLN-000003', project.namingConventions[0]).valid).toBe(
+      false,
+    );
   });
 
   it('checks revisions against its own status codes', () => {
@@ -126,21 +137,23 @@ describe('validateStandard', () => {
   it('catches setup mistakes', () => {
     const broken: InformationStandard = {
       name: ' ',
-      naming: {
-        name: 'Broken',
-        delimiter: 'x',
-        fields: [
-          { key: 'a', label: 'A', minLength: 3, maxLength: 2, charset: 'alphanumeric' },
-          {
-            key: 'a',
-            label: 'B',
-            minLength: 2,
-            maxLength: 2,
-            charset: 'alphanumeric',
-            allowedCodes: { XYZ: 'Too long' },
-          },
-        ],
-      },
+      namingConventions: [
+        {
+          name: 'Broken',
+          delimiter: 'x',
+          fields: [
+            { key: 'a', label: 'A', minLength: 3, maxLength: 2, charset: 'alphanumeric' },
+            {
+              key: 'a',
+              label: 'B',
+              minLength: 2,
+              maxLength: 2,
+              charset: 'alphanumeric',
+              allowedCodes: { XYZ: 'Too long' },
+            },
+          ],
+        },
+      ],
       statusCodes: [
         {
           code: 'A',
@@ -174,6 +187,57 @@ describe('validateStandard', () => {
       'Preliminary and contractual revisions need different prefixes.',
       'Revision numbers must have between 1 and 4 digits.',
       'The version separator must be a single character that is not a letter or digit.',
+    ]);
+  });
+});
+
+describe('several naming variants', () => {
+  const standard: InformationStandard = {
+    ...UK_NATIONAL_ANNEX,
+    namingConventions: [
+      UK_NATIONAL_ANNEX.namingConventions[0]!,
+      {
+        name: 'Documents',
+        delimiter: '-',
+        fields: [
+          { key: 'project', label: 'Project', minLength: 2, maxLength: 6, charset: 'alphanumeric' },
+          {
+            key: 'originator',
+            label: 'Originator',
+            minLength: 2,
+            maxLength: 6,
+            charset: 'alphanumeric',
+          },
+          { key: 'type', label: 'Type', minLength: 2, maxLength: 3, charset: 'alphanumeric' },
+          { key: 'number', label: 'Number', minLength: 4, maxLength: 6, charset: 'numeric' },
+        ],
+      },
+    ],
+  };
+
+  it('accepts a name that fits any variant and says which one', () => {
+    expect(checkName('DEMO-ACME-ZZ-01-DR-A-0001', standard)?.convention.name).toBe(
+      'UK National Annex',
+    );
+    const doc = checkName('DEMO-ACME-PLN-000003', standard);
+    expect(doc?.result.valid).toBe(true);
+    expect(doc?.convention.name).toBe('Documents');
+  });
+
+  it('reports against the closest variant when nothing fits', () => {
+    const match = checkName('DEMO-ACME-PLAN-000003', standard);
+    expect(match?.result.valid).toBe(false);
+    expect(match?.convention.name).toBe('Documents');
+    expect(match?.result.problems[0]?.field).toBe('type');
+  });
+
+  it('requires distinct variant names', () => {
+    const twice = {
+      ...standard,
+      namingConventions: [standard.namingConventions[1]!, standard.namingConventions[1]!],
+    };
+    expect(validateStandard(twice)).toEqual([
+      'Naming variant "Documents" is defined more than once.',
     ]);
   });
 });

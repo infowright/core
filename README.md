@@ -8,19 +8,19 @@ Infowright Core is the open part of [Infowright](https://github.com/infowright) 
 
 ## Packages
 
-| Package                         | Purpose                                                                                                                                                                                        |
-| ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **`@infowright/iso19650`**      | Container states, status codes, revision codes and naming conventions. Every project defines its own **information standard**; the UK National Annex is a ready-made preset to copy and adjust |
-| **`@infowright/project`**       | Project record (code, name, type, client, location, budget, dates, status) with its own copy of the information standard                                                                       |
-| **`@infowright/delivery-plan`** | MIDP / TIDP: milestones, deliverables and what is due at each milestone, validated against the project standard                                                                                |
-| **`@infowright/schedule`**      | Reads programme exports from Excel (Primavera P6, Microsoft Project or a plain sheet), including P6 date formats and actual markers                                                            |
-| **`@infowright/common`**        | Small shared helpers (dates)                                                                                                                                                                   |
+| Package                         | Purpose                                                                                                                                                                                                                                                                                                                                                              |
+| ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **`@infowright/iso19650`**      | Container states, status codes, revision codes and naming conventions. Every project defines its own **information standard** with one or more naming variants (e.g. drawings and documents); a variant can be built from example names. Code lists explain names and are enforced only where a field is set to strict. The UK National Annex is a ready-made preset |
+| **`@infowright/project`**       | Project record (code, name, type, client, location, budget, dates, status) with its own copy of the information standard                                                                                                                                                                                                                                             |
+| **`@infowright/delivery-plan`** | MIDP / TIDP: milestones, deliverables and what is due at each milestone, validated against the project standard                                                                                                                                                                                                                                                      |
+| **`@infowright/schedule`**      | Reads programme exports from Excel (Primavera P6, Microsoft Project or a plain sheet), including P6 date formats and actual markers                                                                                                                                                                                                                                  |
+| **`@infowright/common`**        | Small shared helpers (dates)                                                                                                                                                                                                                                                                                                                                         |
 
 ## Example
 
 ```ts
 import { createProject } from '@infowright/project';
-import { checkRevisionForStatus, validateContainerName } from '@infowright/iso19650';
+import { checkName, checkRevisionForStatus, inferConvention } from '@infowright/iso19650';
 
 // A project starts from the UK National Annex and can then change anything:
 // naming fields, status codes, revision format.
@@ -32,8 +32,14 @@ project.standard.statusCodes.push({
   revisionType: 'contractual',
 });
 
-validateContainerName('DEMO-ACME-ZZ-01-DR-S-001', project.standard.naming).problems;
+checkName('DEMO-ACME-ZZ-01-DR-S-001', project.standard)?.result.problems;
 // [{ field: 'number', message: 'Number "001" has 3 characters; expected 4 to 6.' }]
+
+// Add a second variant for documents, built from an example name.
+const documents = inferConvention(['DEMO-ACME-PLN-000003'], 'Documents');
+if (documents) project.standard.namingConventions.push(documents);
+checkName('DEMO-ACME-REP-000014', project.standard)?.convention.name;
+// 'Documents'
 
 checkRevisionForStatus('P02', 'IFC', project.standard);
 // ['Status code IFC requires a contractual revision, e.g. C01.']

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   describeConvention,
+  inferConvention,
   UK_NA_NAMING_CONVENTION,
   validateContainerName,
   type NamingConvention,
@@ -70,12 +71,6 @@ describe('validateContainerName (UK National Annex)', () => {
     });
   });
 
-  it('rejects unknown type and role codes', () => {
-    const result = validateContainerName('PRJ-ORG-ZZ-01-XX-N-0001');
-    expect(result.problems.map((p) => p.field)).toEqual(['type', 'role']);
-    expect(result.problems[0]?.message).toContain('not a recognised code');
-  });
-
   it('flags leading or trailing spaces', () => {
     const result = validateContainerName(' PRJ-ORG-ZZ-01-DR-S-0001');
     expect(result.valid).toBe(false);
@@ -101,14 +96,15 @@ describe('custom conventions', () => {
         maxLength: 2,
         charset: 'alphanumeric',
         allowedCodes: { AR: 'Architect', ST: 'Structural' },
+        strictCodes: true,
       },
       { key: 'number', label: 'Number', minLength: 5, maxLength: 5, charset: 'numeric' },
     ],
   };
 
   it('validates names against a project-specific convention', () => {
-    expect(validateContainerName('LKP-ST-00042', custom).valid).toBe(true);
-    expect(validateContainerName('LKP-ME-00042', custom).valid).toBe(false);
+    expect(validateContainerName('DMO-ST-00042', custom).valid).toBe(true);
+    expect(validateContainerName('DMO-ME-00042', custom).valid).toBe(false);
   });
 
   it('describes the convention in error messages', () => {
@@ -116,5 +112,64 @@ describe('custom conventions', () => {
     expect(describeConvention(UK_NA_NAMING_CONVENTION)).toBe(
       'Project-Originator-Volume/System-Level/Location-Type-Role-Number',
     );
+  });
+});
+
+describe('code lists', () => {
+  it('accepts codes that are not in the list unless the field is strict', () => {
+    expect(validateContainerName('PRJ-ORG-ZZ-01-XX-CE-0001').valid).toBe(true);
+  });
+
+  it('rejects unlisted codes on a strict field', () => {
+    const strict: NamingConvention = {
+      ...UK_NA_NAMING_CONVENTION,
+      fields: UK_NA_NAMING_CONVENTION.fields.map((f) =>
+        f.key === 'role' ? { ...f, strictCodes: true } : f,
+      ),
+    };
+    expect(validateContainerName('PRJ-ORG-ZZ-01-DR-CE-0001', strict).problems).toEqual([
+      { field: 'role', message: 'Role "CE" is not one of the allowed codes for this project.' },
+    ]);
+  });
+});
+
+describe('inferConvention', () => {
+  it('builds a variant from one example name', () => {
+    expect(inferConvention(['ACM-DMO-Z-GN-RPT-000012.xlsx'], 'Plans')).toEqual({
+      name: 'Plans',
+      delimiter: '-',
+      fields: [
+        { key: 'field-1', label: 'Field 1', minLength: 3, maxLength: 3, charset: 'alphanumeric' },
+        { key: 'field-2', label: 'Field 2', minLength: 3, maxLength: 3, charset: 'alphanumeric' },
+        { key: 'field-3', label: 'Field 3', minLength: 1, maxLength: 1, charset: 'alphanumeric' },
+        { key: 'field-4', label: 'Field 4', minLength: 2, maxLength: 2, charset: 'alphanumeric' },
+        { key: 'field-5', label: 'Field 5', minLength: 3, maxLength: 3, charset: 'alphanumeric' },
+        { key: 'number', label: 'Number', minLength: 6, maxLength: 6, charset: 'numeric' },
+      ],
+    });
+  });
+
+  it('takes length ranges from several examples and detects underscores', () => {
+    const inferred = inferConvention(['AB_X1_0001', 'ABCD_Y_000002'], 'Mixed');
+    expect(inferred?.delimiter).toBe('_');
+    expect(inferred?.fields.map((f) => [f.minLength, f.maxLength])).toEqual([
+      [2, 4],
+      [1, 2],
+      [4, 6],
+    ]);
+  });
+
+  it('reuses labels from a template with the same shape', () => {
+    const inferred = inferConvention(['DEMO-ACME-ZZ-01-DR-CE-0001'], 'Copy', [
+      UK_NA_NAMING_CONVENTION,
+    ]);
+    expect(inferred?.fields.map((f) => f.label)).toEqual(
+      UK_NA_NAMING_CONVENTION.fields.map((f) => f.label),
+    );
+    expect(inferred?.fields[5]).toMatchObject({ key: 'role', minLength: 2, maxLength: 2 });
+  });
+
+  it('returns undefined without examples', () => {
+    expect(inferConvention(['  '], 'Empty')).toBeUndefined();
   });
 });

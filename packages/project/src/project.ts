@@ -15,6 +15,11 @@ export interface Budget {
   currency: string;
 }
 
+export interface Coordinates {
+  lat: number;
+  lng: number;
+}
+
 export interface Project {
   id: string;
   /** Short project code, used in container names. */
@@ -24,6 +29,8 @@ export interface Project {
   type?: string;
   client?: string;
   location?: string;
+  /** Pin on the map for the site. */
+  coordinates?: Coordinates;
   budget?: Budget;
   /** YYYY-MM-DD */
   startDate?: string;
@@ -67,7 +74,9 @@ export function validateProject(project: Project): string[] {
   if (!project.code.trim()) {
     problems.push('The project needs a code.');
   } else {
-    const field = project.standard.naming.fields.find((f) => f.key === 'project');
+    const field = project.standard.namingConventions
+      .flatMap((c) => c.fields)
+      .find((f) => f.key === 'project');
     if (field) {
       for (const p of validateNamingField(field, project.code)) {
         problems.push(`Project code does not fit the naming convention: ${p.message}`);
@@ -77,6 +86,16 @@ export function validateProject(project: Project): string[] {
 
   if (!PROJECT_STATUSES.includes(project.status)) {
     problems.push(`"${project.status}" is not a valid project status.`);
+  }
+
+  if (project.coordinates) {
+    const { lat, lng } = project.coordinates;
+    if (!Number.isFinite(lat) || lat < -90 || lat > 90) {
+      problems.push('The map pin has an invalid latitude.');
+    }
+    if (!Number.isFinite(lng) || lng < -180 || lng > 180) {
+      problems.push('The map pin has an invalid longitude.');
+    }
   }
 
   if (project.budget) {

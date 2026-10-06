@@ -4,6 +4,7 @@ export {
   projectDurationDays,
   validateProject,
   type Budget,
+  type Coordinates,
   type NewProject,
   type Project,
   type ProjectStatus,

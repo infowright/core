@@ -1,8 +1,8 @@
 import { isIsoDate } from '@infowright/common';
 import {
   getStatusCode,
+  checkName,
   UK_NATIONAL_ANNEX,
-  validateContainerName,
   type InformationStandard,
 } from '@infowright/iso19650';
 import { findActivity, type Schedule } from '@infowright/schedule';
@@ -99,7 +99,7 @@ export function validateDeliveryPlan(
       } else {
         seenNames.set(d.containerName, d.id);
       }
-      for (const p of validateContainerName(d.containerName, standard.naming).problems) {
+      for (const p of checkName(d.containerName, standard)?.result.problems ?? []) {
         at(`${d.containerName}: ${p.message}`);
       }
     }

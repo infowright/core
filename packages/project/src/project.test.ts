@@ -31,10 +31,10 @@ describe('createProject', () => {
       state: 'published',
       revisionType: 'contractual',
     });
-    a.standard.naming.fields[0]!.maxLength = 8;
+    a.standard.namingConventions[0]!.fields[0]!.maxLength = 8;
     expect(b.standard.statusCodes.some((s) => s.code === 'IFC')).toBe(false);
-    expect(b.standard.naming.fields[0]!.maxLength).toBe(6);
-    expect(UK_NATIONAL_ANNEX.naming.fields[0]!.maxLength).toBe(6);
+    expect(b.standard.namingConventions[0]!.fields[0]!.maxLength).toBe(6);
+    expect(UK_NATIONAL_ANNEX.namingConventions[0]!.fields[0]!.maxLength).toBe(6);
   });
 });
 
@@ -66,6 +66,15 @@ describe('validateProject', () => {
       '"pounds" is not a currency code. Use three letters, e.g. GBP, EUR, PLN.',
       'The end date is before the start date.',
     ]);
+  });
+
+  it('checks the map pin', () => {
+    expect(
+      validateProject(createProject({ ...base, coordinates: { lat: 53.48, lng: -2.24 } })),
+    ).toEqual([]);
+    expect(validateProject(createProject({ ...base, coordinates: { lat: 91, lng: 200 } }))).toEqual(
+      ['The map pin has an invalid latitude.', 'The map pin has an invalid longitude.'],
+    );
   });
 
   it('includes problems in the project standard', () => {

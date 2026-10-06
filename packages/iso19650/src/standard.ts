@@ -1,4 +1,9 @@
-import { UK_NA_NAMING_CONVENTION, type NamingConvention } from './naming';
+import {
+  matchNamingConventions,
+  UK_NA_NAMING_CONVENTION,
+  type NamingConvention,
+  type NamingMatch,
+} from './naming';
 import {
   exampleRevision,
   parseRevision,
@@ -13,7 +18,8 @@ import { getStatusCode, UK_NA_STATUS_CODES, type StatusCodeDefinition } from './
  */
 export interface InformationStandard {
   name: string;
-  naming: NamingConvention;
+  /** One or more naming variants, e.g. drawings and documents. A name must fit one of them. */
+  namingConventions: NamingConvention[];
   statusCodes: StatusCodeDefinition[];
   revisions: RevisionScheme;
 }
@@ -21,7 +27,7 @@ export interface InformationStandard {
 /** UK National Annex to BS EN ISO 19650-2. A starting point to copy and adjust. */
 export const UK_NATIONAL_ANNEX: InformationStandard = {
   name: 'UK National Annex',
-  naming: UK_NA_NAMING_CONVENTION,
+  namingConventions: [UK_NA_NAMING_CONVENTION],
   statusCodes: [...UK_NA_STATUS_CODES],
   revisions: UK_NA_REVISION_SCHEME,
 };
@@ -97,33 +103,48 @@ export function checkRevisionForStatus(
  */
 export function validateStandard(standard: InformationStandard): string[] {
   const problems: string[] = [];
-  const { naming, statusCodes, revisions } = standard;
+  const { namingConventions, statusCodes, revisions } = standard;
 
   if (!standard.name.trim()) problems.push('The standard needs a name.');
 
-  // Naming convention
-  if (naming.delimiter.length !== 1 || /[A-Za-z0-9]/.test(naming.delimiter)) {
-    problems.push('The naming delimiter must be a single character that is not a letter or digit.');
-  }
-  if (naming.fields.length === 0) problems.push('The naming convention needs at least one field.');
-  const fieldKeys = new Set<string>();
-  for (const f of naming.fields) {
-    const name = f.label || f.key;
-    if (!f.key.trim()) problems.push(`Naming field "${name}" needs a key.`);
-    if (fieldKeys.has(f.key)) problems.push(`Naming field key "${f.key}" is used more than once.`);
-    fieldKeys.add(f.key);
-    if (!Number.isInteger(f.minLength) || f.minLength < 1) {
-      problems.push(`Naming field "${name}": minimum length must be 1 or more.`);
+  // Naming conventions
+  if (namingConventions.length === 0) problems.push('Add at least one naming convention.');
+  const several = namingConventions.length > 1;
+  const variantNames = new Set<string>();
+  for (const naming of namingConventions) {
+    const say = (text: string) =>
+      problems.push(several ? `${naming.name || 'Unnamed variant'}: ${text}` : text);
+
+    if (several) {
+      if (!naming.name.trim()) problems.push('Every naming variant needs a name.');
+      else if (variantNames.has(naming.name)) {
+        problems.push(`Naming variant "${naming.name}" is defined more than once.`);
+      }
+      variantNames.add(naming.name);
     }
-    if (!Number.isInteger(f.maxLength) || f.maxLength < f.minLength) {
-      problems.push(`Naming field "${name}": maximum length must not be less than the minimum.`);
+    if (naming.delimiter.length !== 1 || /[A-Za-z0-9]/.test(naming.delimiter)) {
+      say('The naming delimiter must be a single character that is not a letter or digit.');
     }
-    for (const code of Object.keys(f.allowedCodes ?? {})) {
-      const pattern = f.charset === 'numeric' ? /^[0-9]+$/ : /^[A-Z0-9]+$/;
-      if (!pattern.test(code) || code.length < f.minLength || code.length > f.maxLength) {
-        problems.push(
-          `Naming field "${name}": code "${code}" does not fit the field's length or characters.`,
-        );
+    if (naming.fields.length === 0) say('The naming convention needs at least one field.');
+    const fieldKeys = new Set<string>();
+    for (const f of naming.fields) {
+      const name = f.label || f.key;
+      if (!f.key.trim()) say(`Naming field "${name}" needs a key.`);
+      if (fieldKeys.has(f.key)) say(`Naming field key "${f.key}" is used more than once.`);
+      fieldKeys.add(f.key);
+      if (!Number.isInteger(f.minLength) || f.minLength < 1) {
+        say(`Naming field "${name}": minimum length must be 1 or more.`);
+      }
+      if (!Number.isInteger(f.maxLength) || f.maxLength < f.minLength) {
+        say(`Naming field "${name}": maximum length must not be less than the minimum.`);
+      }
+      for (const code of Object.keys(f.allowedCodes ?? {})) {
+        const pattern = f.charset === 'numeric' ? /^[0-9]+$/ : /^[A-Z0-9]+$/;
+        if (!pattern.test(code) || code.length < f.minLength || code.length > f.maxLength) {
+          say(
+            `Naming field "${name}": code "${code}" does not fit the field's length or characters.`,
+          );
+        }
       }
     }
   }
@@ -189,4 +210,9 @@ export function validateStandard(standard: InformationStandard): string[] {
   }
 
   return problems;
+}
+
+/** Checks a container name against all of a project's naming variants. */
+export function checkName(name: string, standard: InformationStandard): NamingMatch | undefined {
+  return matchNamingConventions(name, standard.namingConventions);
 }

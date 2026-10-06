@@ -5,8 +5,10 @@ export interface NamingField {
   maxLength: number;
   /** alphanumeric: A-Z and 0-9. numeric: 0-9 only. */
   charset: 'alphanumeric' | 'numeric';
-  /** When set, only these codes are accepted. Maps code to meaning. */
+  /** Known codes and their meaning, e.g. DR: Drawing. Used to explain names. */
   allowedCodes?: Readonly<Record<string, string>>;
+  /** When true, only the codes in `allowedCodes` are accepted. Off by default. */
+  strictCodes?: boolean;
 }
 
 export interface NamingConvention {
@@ -185,9 +187,108 @@ export function validateNamingField(field: NamingField, value: string): NamingPr
     at(`${field.label} "${value}" has ${value.length} ${unit}; expected ${expected}.`);
   }
 
-  if (field.allowedCodes && problems.length === 0 && !(value in field.allowedCodes)) {
-    at(`${field.label} "${value}" is not a recognised code for this project.`);
+  if (
+    field.strictCodes &&
+    field.allowedCodes &&
+    problems.length === 0 &&
+    !(value in field.allowedCodes)
+  ) {
+    at(`${field.label} "${value}" is not one of the allowed codes for this project.`);
   }
 
   return problems;
+}
+
+export interface NamingMatch {
+  /** Index of the best matching convention in the list. */
+  index: number;
+  convention: NamingConvention;
+  result: NamingResult;
+}
+
+/**
+ * Checks a name against several naming conventions (e.g. one for drawings, one for documents)
+ * and returns the best match: the first one it fits, otherwise the closest one.
+ */
+export function matchNamingConventions(
+  name: string,
+  conventions: readonly NamingConvention[],
+): NamingMatch | undefined {
+  let best: NamingMatch | undefined;
+  let bestScore = Number.POSITIVE_INFINITY;
+
+  conventions.forEach((convention, index) => {
+    const result = validateContainerName(name, convention);
+    if (result.valid && !best?.result.valid) {
+      best = { index, convention, result };
+      bestScore = -1;
+      return;
+    }
+    if (best?.result.valid) return;
+    // Same number of fields scores by problem count; a different count is always worse.
+    const sameShape = Object.keys(result.values).length > 0;
+    const score = sameShape ? result.problems.length : 1000 + index;
+    if (score < bestScore) {
+      best = { index, convention, result };
+      bestScore = score;
+    }
+  });
+
+  return best;
+}
+
+const CANDIDATE_DELIMITERS = ['-', '_'];
+
+/**
+ * Builds a naming convention from one or more example names, so a project can be set up
+ * by pasting real names instead of typing rules. Field labels are copied from `templates`
+ * when one has the same number of fields; otherwise fields are numbered and the last
+ * all-digit field is called Number.
+ */
+export function inferConvention(
+  samples: readonly string[],
+  name: string,
+  templates: readonly NamingConvention[] = [],
+): NamingConvention | undefined {
+  const clean = samples.map((s) => s.trim().replace(FILE_EXTENSION, '')).filter(Boolean);
+  if (clean.length === 0) return undefined;
+
+  const delimiter =
+    CANDIDATE_DELIMITERS.map((d) => ({ d, n: clean.filter((s) => s.includes(d)).length }))
+      .sort((a, b) => b.n - a.n)
+      .find((c) => c.n > 0)?.d ?? '-';
+
+  const split = clean.map((s) => s.split(delimiter));
+  const counts = new Map<number, number>();
+  for (const parts of split) counts.set(parts.length, (counts.get(parts.length) ?? 0) + 1);
+  const fieldCount = [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? 1;
+  const rows = split.filter((parts) => parts.length === fieldCount);
+
+  const template = templates.find(
+    (t) => t.fields.length === fieldCount && t.delimiter === delimiter,
+  );
+
+  const columns = Array.from({ length: fieldCount }, (_, i) => rows.map((r) => r[i] ?? ''));
+  const lastNumeric = columns.map((c) => c.every((v) => /^[0-9]+$/.test(v))).lastIndexOf(true);
+
+  const fields: NamingField[] = columns.map((values, i) => {
+    const lengths = values.map((v) => v.length);
+    const numeric = values.every((v) => /^[0-9]+$/.test(v));
+    const fromTemplate = template?.fields[i];
+    const base = fromTemplate
+      ? { key: fromTemplate.key, label: fromTemplate.label }
+      : i === lastNumeric
+        ? { key: 'number', label: 'Number' }
+        : { key: `field-${i + 1}`, label: `Field ${i + 1}` };
+    const field: NamingField = {
+      ...base,
+      minLength: Math.max(1, Math.min(...lengths)),
+      maxLength: Math.max(1, ...lengths),
+      charset: numeric ? 'numeric' : 'alphanumeric',
+    };
+    if (fromTemplate?.allowedCodes) field.allowedCodes = fromTemplate.allowedCodes;
+    return field;
+  });
+
+  return { name, delimiter, fields };
 }

@@ -24,6 +24,8 @@ export {
 
 export {
   describeConvention,
+  inferConvention,
+  matchNamingConventions,
   UK_NA_NAMING_CONVENTION,
   UK_NA_ROLE_CODES,
   UK_NA_TYPE_CODES,
@@ -31,11 +33,13 @@ export {
   validateNamingField,
   type NamingConvention,
   type NamingField,
+  type NamingMatch,
   type NamingProblem,
   type NamingResult,
 } from './naming';
 
 export {
+  checkName,
   checkRevisionForStatus,
   UK_NATIONAL_ANNEX,
   validateStandard,

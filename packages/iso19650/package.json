@@ -1,0 +1,11 @@
+{
+  "name": "@infowright/iso19650",
+  "version": "0.0.0",
+  "private": true,
+  "description": "ISO 19650 concepts as typed, tested data",
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  }
+}

@@ -8,18 +8,31 @@ Infowright Core is the open part of [Infowright](https://github.com/infowright) 
 
 ## What will live here
 
-| Module | Purpose |
-|---|---|
-| **ISO 19650 codes** | Status codes (S0-S4, A, B...), revision codes (P01, C01...), container states (WIP, Shared, Published, Archived) as typed, testable data |
-| **Naming conventions** | Configurable container naming conventions (Project-Originator-Volume-Level-Type-Role-Number and variants) with a validator that explains *why* a name fails |
-| **Delivery plan schema** | A common data model for MIDP / TIDP / responsibility matrix |
-| **Schedule parsers** | Readers for Primavera P6 (XER), Microsoft Project (XML) and Excel schedules |
+| Module                   | Purpose                                                                                                                                                     |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **ISO 19650 codes**      | Status codes (S0-S4, A, B...), revision codes (P01, C01...), container states (WIP, Shared, Published, Archived) as typed, testable data                    |
+| **Naming conventions**   | Configurable container naming conventions (Project-Originator-Volume-Level-Type-Role-Number and variants) with a validator that explains _why_ a name fails |
+| **Delivery plan schema** | A common data model for MIDP / TIDP / responsibility matrix                                                                                                 |
+| **Schedule parsers**     | Readers for Primavera P6 (XER), Microsoft Project (XML) and Excel schedules                                                                                 |
 
 ## Principles
 
 - **Standards first.** Everything maps to ISO 19650 terms, so the data makes sense to any information manager.
 - **No project data in this repository.** Tests use made-up sample data only.
 - **Small and dependable.** Each module does one job, is fully tested and can be used on its own.
+
+## Development
+
+Requirements: Node.js 22.12+ (24 recommended, see `.nvmrc`) and pnpm 12.
+
+```sh
+pnpm install     # install dependencies
+pnpm test        # run tests
+pnpm check       # everything CI runs: formatting, linting, type checks, tests
+pnpm format      # auto-format all files
+```
+
+Every pull request runs `pnpm check` on GitHub Actions and must pass before merging.
 
 ## Licence
 

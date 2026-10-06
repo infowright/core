@@ -57,6 +57,11 @@ describe('validateContainerName (UK National Annex)', () => {
     expect(result.problems[1]?.message).toContain('expected 4 to 6');
   });
 
+  it('uses the singular for one character', () => {
+    const result = validateContainerName('PRJ-ORG-ZZ-1-DR-S-0001');
+    expect(result.problems[0]?.message).toBe('Level/Location "1" has 1 character; expected 2.');
+  });
+
   it('requires a numeric number field', () => {
     const result = validateContainerName('PRJ-ORG-ZZ-01-DR-S-00A1');
     expect(result.problems[0]).toEqual({

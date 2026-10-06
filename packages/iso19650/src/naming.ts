@@ -181,7 +181,8 @@ export function validateNamingField(field: NamingField, value: string): NamingPr
       field.minLength === field.maxLength
         ? `${field.minLength}`
         : `${field.minLength} to ${field.maxLength}`;
-    at(`${field.label} "${value}" has ${value.length} characters; expected ${expected}.`);
+    const unit = value.length === 1 ? 'character' : 'characters';
+    at(`${field.label} "${value}" has ${value.length} ${unit}; expected ${expected}.`);
   }
 
   if (field.allowedCodes && problems.length === 0 && !(value in field.allowedCodes)) {

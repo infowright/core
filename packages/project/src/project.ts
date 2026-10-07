@@ -20,6 +20,28 @@ export interface Coordinates {
   lng: number;
 }
 
+/** A task team (ISO 19650 information author) on this project, and who to contact there. */
+export interface TaskTeam {
+  /** Code used in the delivery plan and in container names, e.g. ACM. */
+  code: string;
+  /** Company or team name. */
+  name?: string;
+  /** Email addresses that receive this team's reminders. */
+  contacts: string[];
+}
+
+/** Weekly reminders to task teams about their own overdue and upcoming deliveries. */
+export interface ReminderSettings {
+  enabled: boolean;
+  /** Where replies to reminders go, usually the information manager. */
+  replyTo?: string;
+}
+
+const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/** True for a plausible email address. */
+export const isEmail = (value: string) => EMAIL.test(value);
+
 export interface Project {
   id: string;
   /** Short project code, used in container names. */
@@ -39,6 +61,8 @@ export interface Project {
   status: ProjectStatus;
   /** This project's own copy of the standard. Editing it never affects other projects. */
   standard: InformationStandard;
+  taskTeams?: TaskTeam[];
+  reminders?: ReminderSettings;
 }
 
 export type NewProject = Omit<Project, 'status' | 'standard'> & {
@@ -96,6 +120,24 @@ export function validateProject(project: Project): string[] {
     if (!Number.isFinite(lng) || lng < -180 || lng > 180) {
       problems.push('The map pin has an invalid longitude.');
     }
+  }
+
+  const codes = new Set<string>();
+  for (const team of project.taskTeams ?? []) {
+    if (!team.code.trim()) {
+      problems.push('A task team has no code.');
+      continue;
+    }
+    if (codes.has(team.code)) problems.push(`Task team ${team.code} is listed twice.`);
+    codes.add(team.code);
+    for (const contact of team.contacts) {
+      if (!isEmail(contact)) {
+        problems.push(`Task team ${team.code}: "${contact}" is not an email address.`);
+      }
+    }
+  }
+  if (project.reminders?.replyTo && !isEmail(project.reminders.replyTo)) {
+    problems.push(`Reminders: "${project.reminders.replyTo}" is not an email address.`);
   }
 
   if (project.budget) {

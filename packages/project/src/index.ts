@@ -1,4 +1,5 @@
 export {
+  isEmail,
   createProject,
   PROJECT_STATUSES,
   projectDurationDays,
@@ -7,5 +8,7 @@ export {
   type Coordinates,
   type NewProject,
   type Project,
+  type ReminderSettings,
+  type TaskTeam,
   type ProjectStatus,
 } from './project';

@@ -100,3 +100,24 @@ describe('projectDurationDays', () => {
     expect(projectDurationDays(createProject({ ...base, endDate: undefined }))).toBeUndefined();
   });
 });
+
+describe('task teams and reminders', () => {
+  it('checks codes and contact addresses', () => {
+    const project = createProject({ id: 'p', code: 'DMO', name: 'Demo' });
+    expect(
+      validateProject({
+        ...project,
+        taskTeams: [
+          { code: 'ACM', name: 'Acme', contacts: ['anna@acme.com'] },
+          { code: 'ACM', contacts: [] },
+          { code: 'BRK', contacts: ['not an address'] },
+        ],
+        reminders: { enabled: true, replyTo: 'im@' },
+      }),
+    ).toEqual([
+      'Task team ACM is listed twice.',
+      'Task team BRK: "not an address" is not an email address.',
+      'Reminders: "im@" is not an email address.',
+    ]);
+  });
+});

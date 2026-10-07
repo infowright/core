@@ -131,4 +131,40 @@ describe('compareWithRegister', () => {
     );
     expect(checks.find((c) => c.deliverableId === 'c')?.state).toBe('delivered');
   });
+
+  it('needs a newer issue for a later gate', () => {
+    const twoGates: DeliveryPlan = {
+      milestones: [
+        { id: 'g2', name: 'Gate 2', date: '2026-09-30' },
+        { id: 'g3', name: 'Gate 3', date: '2027-03-31' },
+      ],
+      deliverables: [
+        {
+          id: 'a',
+          containerName: 'DMO-ACM-ZZ-ZZ-DR-C-0001',
+          title: 'Layout',
+          taskTeam: 'ACM',
+          issues: [
+            { milestoneId: 'g3', status: 'S2' },
+            { milestoneId: 'g2', status: 'S2' },
+          ],
+        },
+      ],
+    };
+    const states = (date: string) =>
+      compareWithRegister(
+        twoGates,
+        { entries: [{ name: 'DMO-ACM-ZZ-ZZ-DR-C-0001', revision: 'P01', status: 'S2', date }] },
+        { today: '2026-10-07' },
+      ).checks.map((c) => [c.milestoneId, c.state]);
+
+    expect(states('2026-09-20')).toEqual([
+      ['g3', 'in-progress'],
+      ['g2', 'delivered'],
+    ]);
+    expect(states('2026-10-05')).toEqual([
+      ['g3', 'delivered'],
+      ['g2', 'delivered'],
+    ]);
+  });
 });

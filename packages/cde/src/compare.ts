@@ -11,7 +11,8 @@ import type { Register, RegisterEntry } from './types';
 
 /**
  * delivered: in the CDE with the target status, or a further one (shared before published).
- * in-progress: in the CDE, but not yet at the target status.
+ * in-progress: in the CDE, but not yet at the target status, or only in a version from before
+ * the previous gate.
  * missing: not in the CDE.
  */
 export type DeliveryState = 'delivered' | 'in-progress' | 'missing';
@@ -116,15 +117,28 @@ export function compareWithRegister(
   const checks: DeliveryCheck[] = [];
   for (const d of plan.deliverables) {
     const entry = latest.get(d.id);
-    for (const issue of d.issues) {
-      const due = resolveDueDate(issue, plan, options.schedule);
+    // Later gates need a newer issue: an entry from before the previous gate's due date
+    // only counts for that earlier gate.
+    const dues = d.issues.map((issue) => resolveDueDate(issue, plan, options.schedule));
+    const order = d.issues
+      .map((_, i) => i)
+      .sort((a, b) => (dues[a] ?? '9999').localeCompare(dues[b] ?? '9999'));
+    const previousDue = new Map<number, string | undefined>();
+    order.forEach((index, position) => {
+      previousDue.set(index, position > 0 ? dues[order[position - 1] ?? -1] : undefined);
+    });
+
+    d.issues.forEach((issue, index) => {
+      const due = dues[index];
       let state: DeliveryState = 'missing';
       const problems: string[] = [];
 
       if (entry) {
+        const before = previousDue.get(index);
+        const tooOld = before !== undefined && entry.date !== undefined && entry.date <= before;
         if (!entry.status) {
           // The export has no status: being in the CDE is all that can be told.
-          state = 'delivered';
+          state = tooOld ? 'in-progress' : 'delivered';
         } else {
           const actual = getStatusCode(entry.status, standard.statusCodes);
           const target = issue.status
@@ -132,10 +146,8 @@ export function compareWithRegister(
             : undefined;
           const needed = target && !target.withdrawn ? RANK[target.state] : RANK.shared;
           if (!actual) problems.push(`"${entry.status}" is not a status code of this project.`);
-          state =
-            actual && !actual.withdrawn && RANK[actual.state] >= needed
-              ? 'delivered'
-              : 'in-progress';
+          const meets = actual && !actual.withdrawn && RANK[actual.state] >= needed;
+          state = meets && !tooOld ? 'delivered' : 'in-progress';
           if (actual && entry.revision) {
             problems.push(...checkRevisionForStatus(entry.revision, entry.status, standard));
           }
@@ -152,7 +164,7 @@ export function compareWithRegister(
       if (entry) check.entry = entry;
       if (due) check.due = due;
       checks.push(check);
-    }
+    });
   }
 
   return { checks, unplanned };

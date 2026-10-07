@@ -12,8 +12,8 @@ export interface DeliveryPlan {
 export interface Milestone {
   id: string;
   name: string;
-  /** Planned date, YYYY-MM-DD. */
-  date: string;
+  /** Planned date, YYYY-MM-DD. Often set later than the milestone itself. */
+  date?: string;
 }
 
 /** One planned information container. */
@@ -35,8 +35,8 @@ export interface Deliverable {
 /** What a deliverable must look like at a given milestone. */
 export interface PlannedIssue {
   milestoneId: string;
-  /** Target status code, e.g. S2 or A1. */
-  status: string;
+  /** Target status code, e.g. S2 or A1. Often left empty in real plans until closer to the date. */
+  status?: string;
   /** Level of information need, as text or a reference to a LOIN specification. */
   loin?: string;
   /** Specific due date, YYYY-MM-DD. When empty, the milestone date applies. */

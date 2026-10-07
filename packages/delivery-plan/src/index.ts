@@ -5,3 +5,10 @@ export {
   type PlanProblem,
   type ValidateOptions,
 } from './validate';
+export {
+  readDeliveryPlanSheets,
+  type PlanImport,
+  type ReadOptions,
+  type SheetInput,
+  type SheetSummary,
+} from './read-sheets';

@@ -69,7 +69,7 @@ export function validateDeliveryPlan(
     if (!m.name.trim()) {
       problems.push({ milestoneId: m.id, message: `Milestone "${m.id}" has no name.` });
     }
-    if (!isIsoDate(m.date)) {
+    if (m.date !== undefined && !isIsoDate(m.date)) {
       problems.push({
         milestoneId: m.id,
         message: `Milestone "${m.name || m.id}" has an invalid date "${m.date}". Use YYYY-MM-DD.`,
@@ -122,16 +122,19 @@ export function validateDeliveryPlan(
       }
       issueMilestones.add(mid);
 
-      const status = getStatusCode(issue.status, standard.statusCodes);
-      if (!status) {
-        at(`"${name}" has an unknown target status "${issue.status}" for "${mid}".`, mid);
-      } else if (status.withdrawn) {
-        at(`"${name}" targets withdrawn status ${issue.status} for "${mid}".`, mid);
-      } else if (status.state === 'wip') {
-        at(
-          `"${name}" targets ${issue.status} for "${mid}", but work in progress is never a delivery. Use a shared or published status.`,
-          mid,
-        );
+      // A missing target status is allowed: it is usually agreed closer to the milestone.
+      if (issue.status) {
+        const status = getStatusCode(issue.status, standard.statusCodes);
+        if (!status) {
+          at(`"${name}" has an unknown target status "${issue.status}" for "${mid}".`, mid);
+        } else if (status.withdrawn) {
+          at(`"${name}" targets withdrawn status ${issue.status} for "${mid}".`, mid);
+        } else if (status.state === 'wip') {
+          at(
+            `"${name}" targets ${issue.status} for "${mid}", but work in progress is never a delivery. Use a shared or published status.`,
+            mid,
+          );
+        }
       }
 
       if (

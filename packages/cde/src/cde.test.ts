@@ -1,3 +1,4 @@
+import { UK_NATIONAL_ANNEX } from '@infowright/iso19650';
 import type { DeliveryPlan } from '@infowright/delivery-plan';
 import { describe, expect, it } from 'vitest';
 import { compareWithRegister } from './compare';
@@ -41,6 +42,24 @@ describe('readRegisterSheets', () => {
         date: '2026-10-01',
       },
       { name: 'DMO-ACM-ZZ-ZZ-DR-C-0002', title: 'Drainage', date: '2026-09-30' },
+    ]);
+  });
+
+  it('takes revision and status from file names when the export has no columns for them', () => {
+    const { register } = readRegisterSheets(
+      [
+        {
+          name: 'Export',
+          rows: [
+            ['Name', 'Last updated'],
+            ['DMO-ACM-ZZ-ZZ-DR-C-0001-P02-S2.pdf', '2026-10-01'],
+          ],
+        },
+      ],
+      { standard: UK_NATIONAL_ANNEX },
+    );
+    expect(register.entries).toEqual([
+      { name: 'DMO-ACM-ZZ-ZZ-DR-C-0001', revision: 'P02', status: 'S2', date: '2026-10-01' },
     ]);
   });
 

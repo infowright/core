@@ -7,3 +7,4 @@ export {
   type DeliveryState,
   type RegisterComparison,
 } from './compare';
+export { splitFileName } from './file-name';

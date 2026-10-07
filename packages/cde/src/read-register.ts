@@ -1,4 +1,6 @@
 import { cellText, normaliseHeader, type SheetInput } from '@infowright/common';
+import type { InformationStandard } from '@infowright/iso19650';
+import { splitFileName } from './file-name';
 import { parseScheduleDate } from '@infowright/schedule';
 import type { Register, RegisterEntry } from './types';
 
@@ -69,9 +71,13 @@ const EXTENSION = /\.[a-z0-9]{2,5}$/i;
  * Reads a list of containers exported from a CDE (Autodesk Docs, ProjectWise, Aconex, SharePoint
  * or any other) to Excel or CSV. Headers are matched loosely and can be anywhere near the top.
  * File extensions are removed from names; a status such as "S2 - Suitable for information"
- * becomes "S2".
+ * becomes "S2". With the project standard given, a revision or status written at the end of a
+ * file name is used when the export has no column for it.
  */
-export function readRegisterSheets(sheets: readonly SheetInput[]): RegisterImport {
+export function readRegisterSheets(
+  sheets: readonly SheetInput[],
+  options: { standard?: InformationStandard } = {},
+): RegisterImport {
   const entries: RegisterEntry[] = [];
   const problems: string[] = [];
   let found = false;
@@ -110,6 +116,12 @@ export function readRegisterSheets(sheets: readonly SheetInput[]): RegisterImpor
       if (title) entry.title = title;
       if (revision) entry.revision = revision.toUpperCase();
       if (status) entry.status = status;
+      if (options.standard && (!entry.revision || !entry.status)) {
+        const parts = splitFileName(entry.name, options.standard);
+        entry.name = parts.name;
+        if (!entry.revision && parts.revision) entry.revision = parts.revision;
+        if (!entry.status && parts.status) entry.status = parts.status;
+      }
       if (columns.date !== undefined) {
         const raw = cells[columns.date];
         const date = parseScheduleDate(typeof raw === 'string' ? raw.slice(0, 16) : raw);

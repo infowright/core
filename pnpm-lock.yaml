@@ -188,6 +188,21 @@ importers:
         specifier: 5.0.3
         version: 5.0.3(@types/node@24.19.1)(vite@8.3.2(@types/node@24.19.1))
 
+  packages/cde:
+    dependencies:
+      '@infowright/common':
+        specifier: workspace:*
+        version: link:../common
+      '@infowright/delivery-plan':
+        specifier: workspace:*
+        version: link:../delivery-plan
+      '@infowright/iso19650':
+        specifier: workspace:*
+        version: link:../iso19650
+      '@infowright/schedule':
+        specifier: workspace:*
+        version: link:../schedule
+
   packages/common: {}
 
   packages/delivery-plan:

@@ -1,0 +1,17 @@
+{
+  "name": "@infowright/cde",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Information containers as published in a CDE: register reader and comparison with the delivery plan",
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@infowright/common": "workspace:*",
+    "@infowright/delivery-plan": "workspace:*",
+    "@infowright/iso19650": "workspace:*",
+    "@infowright/schedule": "workspace:*"
+  }
+}

@@ -49,6 +49,8 @@ const DELIVERABLE_COLUMNS: Record<DeliverableField, readonly string[]> = {
     'documentno',
     'docno',
     'docnumber',
+    'documentreferencenumber',
+    'documentreferenceno',
     'documentreference',
     'documentref',
     'referencenumber',
@@ -63,6 +65,8 @@ const DELIVERABLE_COLUMNS: Record<DeliverableField, readonly string[]> = {
     'documenttitle',
     'containertitle',
     'drawingtitle',
+    'combinedtitle',
+    'fulltitle',
     'description',
     'documentdescription',
     'name',
@@ -100,10 +104,14 @@ const ISSUE_COLUMNS: Record<IssueField, readonly string[]> = {
     'deliverydate',
     'planneddate',
     'issuedate',
+    'deliverymilestonesdate',
+    'deliverymilestonedate',
+    'milestonedate',
   ],
   activity: [
     'activityid',
     'programmeactivityid',
+    'programmeactivitycode',
     'programmeactivity',
     'p6activityid',
     'activitycode',
@@ -226,7 +234,33 @@ function planLayout(headers: Header[], standard: InformationStandard): Layout {
       break;
     }
   }
+  // With one block per gate, unnumbered columns such as a trailing "Suitability" describe the
+  // current state of the container, not a target, so they are left out.
+  if ([...layout.blocks.keys()].some((n) => n > 0)) layout.blocks.delete(0);
   return layout;
+}
+
+/**
+ * Sheets often name each gate in a merged cell above its block of columns,
+ * e.g. "GATE - 2 (Concept Design)". The label must mention the block number to be used.
+ */
+function gateLabels(layout: Layout, above: readonly unknown[] | undefined): Map<number, string> {
+  const labels = new Map<number, string>();
+  if (!above) return labels;
+  const starts = [...layout.blocks.entries()]
+    .filter(([n]) => n > 0)
+    .map(([n, block]) => [n, Math.min(...Object.values(block).map((h) => h.index))] as const)
+    .sort((a, b) => a[1] - b[1]);
+  starts.forEach(([n, start], i) => {
+    const floor = i > 0 ? (starts[i - 1]?.[1] ?? 0) + 1 : 0;
+    for (let c = start; c >= floor; c--) {
+      const label = text(above[c]);
+      if (!label) continue;
+      if (new RegExp(`(^|\\D)${n}(\\D|$)`).test(label)) labels.set(n, label);
+      break;
+    }
+  });
+  return labels;
 }
 
 function score(layout: Layout): number {
@@ -284,6 +318,7 @@ export function readDeliveryPlanSheets(
       continue;
     }
     const { row: headerRow, layout } = found;
+    const labels = gateLabels(layout, sheet.rows[headerRow - 1]);
     const summary: SheetSummary = {
       name: sheet.name,
       headerRow: headerRow + 1,
@@ -309,6 +344,8 @@ export function readDeliveryPlanSheets(
       const where = `${sheet.name}, row ${r + 1}`;
 
       let containerName = cell(layout.deliverable.containerName);
+      // A name built by a formula from empty parts is only delimiters: an unused template row.
+      if (!/[a-z0-9]/i.test(containerName)) containerName = '';
       let partialName = false;
       let originatorPart = '';
       if (!containerName && layout.nameParts) {
@@ -335,7 +372,9 @@ export function readDeliveryPlanSheets(
           continue;
         }
         const milestoneName =
-          values.milestone || (number > 0 ? `Gate ${number}` : DEFAULT_MILESTONE);
+          values.milestone ||
+          labels.get(number) ||
+          (number > 0 ? `Gate ${number}` : DEFAULT_MILESTONE);
         const issue: PlannedIssue = { milestoneId: milestoneId(milestoneName) };
         const status = values.status.split(/[\s:-]+/)[0]?.toUpperCase();
         if (status) issue.status = status;

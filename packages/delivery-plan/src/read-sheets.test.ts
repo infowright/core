@@ -78,6 +78,62 @@ describe('readDeliveryPlanSheets', () => {
     expect(result.sheets[0]?.columns.status).toEqual(['Suitability 1', 'Suitability - 2']);
   });
 
+  it('reads a sheet with gate names above the columns and current-state columns at the end', () => {
+    const result = readDeliveryPlanSheets([
+      {
+        name: 'Area 1',
+        rows: [
+          ['Information delivery plan'],
+          [null, null, null, 'GATE - 1', null, null, 'GATE - 2 (Concept Design)', null, null],
+          [
+            'Document Reference Number',
+            'Combined Title',
+            'Originator',
+            'Suitability - 1',
+            'Programme Activity Code - 1',
+            'Delivery Milestones date - 1',
+            'Suitability - 2',
+            'Programme Activity Code - 2',
+            'Delivery Milestones date - 2',
+            'Suitability',
+          ],
+          [
+            'DMO-ACM-ZZ-ZZ-RP-C-0001',
+            'Basis of design',
+            'ACM',
+            'S2',
+            'C1000',
+            '',
+            'S4',
+            'C2000',
+            new Date(Date.UTC(2027, 5, 30)),
+            'S0',
+          ],
+        ],
+      },
+    ]);
+
+    expect(result.plan.milestones.map((m) => m.name)).toEqual([
+      'GATE - 1',
+      'GATE - 2 (Concept Design)',
+    ]);
+    expect(result.plan.deliverables[0]).toEqual({
+      id: 'DMO-ACM-ZZ-ZZ-RP-C-0001',
+      containerName: 'DMO-ACM-ZZ-ZZ-RP-C-0001',
+      title: 'Basis of design',
+      taskTeam: 'ACM',
+      issues: [
+        { milestoneId: 'gate-1', status: 'S2', activityId: 'C1000' },
+        {
+          milestoneId: 'gate-2-concept-design',
+          status: 'S4',
+          activityId: 'C2000',
+          due: '2027-06-30',
+        },
+      ],
+    });
+  });
+
   it('uses a milestone column when there is one', () => {
     const result = readDeliveryPlanSheets([
       {
@@ -121,6 +177,7 @@ describe('readDeliveryPlanSheets', () => {
           ['Document No.', 'Title', 'Originator'],
           ['', 'Area 1 - Civils', ''],
           [],
+          ['------', '', ''],
           ['DMO-ACM-ZZ-ZZ-DR-C-0001', 'Site layout', 'ACM'],
         ],
       },

@@ -12,3 +12,4 @@ export {
   type SheetInput,
   type SheetSummary,
 } from './read-sheets';
+export { compareWithProgramme, type ProgrammeCheck } from './programme';

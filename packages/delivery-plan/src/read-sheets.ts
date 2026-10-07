@@ -1,12 +1,9 @@
+import { cellText, normaliseHeader, type SheetInput } from '@infowright/common';
 import { checkName, UK_NATIONAL_ANNEX, type InformationStandard } from '@infowright/iso19650';
 import { parseScheduleDate } from '@infowright/schedule';
 import type { Deliverable, DeliveryPlan, Milestone, PlannedIssue } from './types';
 
-/** One worksheet: its name and its cells, row by row, as read by any spreadsheet reader. */
-export interface SheetInput {
-  name: string;
-  rows: readonly (readonly unknown[])[];
-}
+export type { SheetInput } from '@infowright/common';
 
 type DeliverableField = 'containerName' | 'title' | 'taskTeam' | 'author';
 type IssueField = 'milestone' | 'status' | 'due' | 'activity' | 'loin';
@@ -124,15 +121,8 @@ const ISSUE_COLUMNS: Record<IssueField, readonly string[]> = {
 const HEADER_SEARCH_ROWS = 30;
 const DEFAULT_MILESTONE = 'Delivery';
 
-const normalise = (value: string) => value.toLowerCase().replace(/[^a-z0-9]/g, '');
-
-const text = (value: unknown): string => {
-  if (value === null || value === undefined) return '';
-  if (value instanceof Date) return Number.isNaN(value.getTime()) ? '' : value.toISOString();
-  if (typeof value === 'string') return value.trim();
-  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
-  return '';
-};
+const normalise = normaliseHeader;
+const text = cellText;
 
 const slug = (value: string) =>
   value

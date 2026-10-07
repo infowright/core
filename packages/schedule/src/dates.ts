@@ -38,7 +38,12 @@ function fromExcelSerial(serial: number): string | undefined {
 export function parseScheduleDate(value: unknown): ScheduleDate | undefined {
   if (value instanceof Date) {
     if (Number.isNaN(value.getTime())) return undefined;
-    const date = toIsoDate(value.getFullYear(), value.getMonth() + 1, value.getDate());
+    // Spreadsheet readers give dates as midnight UTC. Read those in UTC so the day does not
+    // shift in time zones west of Greenwich; any other time is read in local time.
+    const utc = value.getUTCHours() === 0 && value.getUTCMinutes() === 0;
+    const date = utc
+      ? toIsoDate(value.getUTCFullYear(), value.getUTCMonth() + 1, value.getUTCDate())
+      : toIsoDate(value.getFullYear(), value.getMonth() + 1, value.getDate());
     return date ? { date, actual: false } : undefined;
   }
 

@@ -3,6 +3,28 @@ import { readDeliveryPlanSheets } from './read-sheets';
 import { validateDeliveryPlan } from './validate';
 
 describe('readDeliveryPlanSheets', () => {
+  it('takes the code from the container name when the company column holds a company name', () => {
+    const result = readDeliveryPlanSheets([
+      {
+        name: 'TIDP',
+        rows: [
+          ['Document Number', 'Title', 'Company'],
+          ['DMO-ACM-ZZ-ZZ-DR-C-0001', 'Site layout', 'Acme Civils (UK) Ltd'],
+          ['DMO-ACM-ZZ-ZZ-DR-C-0002', 'Drainage', 'Acme Civils (UK) Ltd'],
+          ['Legend sheet', 'Legend', 'Acme Civils (UK) Ltd'],
+          ['DMO-BCE-ZZ-ZZ-DR-S-0001', 'Frame', 'BCE'],
+        ],
+      },
+    ]);
+    expect(result.plan.deliverables.map((d) => d.taskTeam)).toEqual([
+      'ACM',
+      'ACM',
+      'Acme Civils (UK) Ltd',
+      'BCE',
+    ]);
+    expect(result.teamNames).toEqual({ ACM: 'Acme Civils (UK) Ltd' });
+  });
+
   it('finds the header row below title rows and reads one deliverable per row', () => {
     const result = readDeliveryPlanSheets([
       {

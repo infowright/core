@@ -1,5 +1,10 @@
 import { cellText, normaliseHeader, type SheetInput } from '@infowright/common';
-import { checkName, UK_NATIONAL_ANNEX, type InformationStandard } from '@infowright/iso19650';
+import {
+  checkName,
+  UK_NATIONAL_ANNEX,
+  validateNamingField,
+  type InformationStandard,
+} from '@infowright/iso19650';
 import { parseScheduleDate } from '@infowright/schedule';
 import type { Deliverable, DeliveryPlan, Milestone, PlannedIssue } from './types';
 
@@ -24,6 +29,11 @@ export interface PlanImport {
   sheets: SheetSummary[];
   /** Problems in plain language. The plan still contains every row that could be read. */
   problems: string[];
+  /**
+   * Company names found in the task team column where the code was taken from the container
+   * name instead, by task team code. E.g. { HUK: "Example Construction Ltd" }.
+   */
+  teamNames: Record<string, string>;
 }
 
 export interface ReadOptions {
@@ -294,6 +304,12 @@ export function readDeliveryPlanSheets(
   const milestones = new Map<string, Milestone>();
   const deliverables: Deliverable[] = [];
   const ids = new Set<string>();
+  const teamNames: Record<string, string> = {};
+  const originatorField = standard.namingConventions
+    .flatMap((c) => c.fields)
+    .find((f) => f.key === 'originator');
+  const isCode = (value: string) =>
+    !!value && (!originatorField || validateNamingField(originatorField, value).length === 0);
 
   const milestoneId = (name: string) => {
     const id = slug(name);
@@ -382,8 +398,19 @@ export function readDeliveryPlanSheets(
         [taskTeam, author].filter(Boolean).length + issues.length + (partialName ? 1 : 0);
       if (!containerName && !(title && detail > 0)) continue;
 
-      if (!taskTeam && containerName) {
-        taskTeam = checkName(containerName, standard)?.result.values.originator ?? '';
+      // The task team column often holds the company name ("Example Construction Ltd") rather
+      // than its code. The code in the container name is then the better choice.
+      if (!isCode(taskTeam)) {
+        const fromName = containerName
+          ? (checkName(containerName, standard)?.result.values.originator ?? '')
+          : '';
+        const code = [originatorPart, fromName].find(isCode);
+        if (code) {
+          if (taskTeam && !teamNames[code]) teamNames[code] = taskTeam;
+          taskTeam = code;
+        } else if (!taskTeam) {
+          taskTeam = fromName;
+        }
       }
       if (issues.length === 0) issues.push({ milestoneId: milestoneId(DEFAULT_MILESTONE) });
 
@@ -417,5 +444,6 @@ export function readDeliveryPlanSheets(
     plan: { milestones: [...milestones.values()], deliverables },
     sheets: summaries,
     problems,
+    teamNames,
   };
 }

@@ -26,6 +26,8 @@ export interface TaskTeam {
   code: string;
   /** Company or team name. */
   name?: string;
+  /** The company in the organisation that this team belongs to, by its id. */
+  companyId?: string;
   /** Email addresses that receive this team's reminders. */
   contacts: string[];
 }

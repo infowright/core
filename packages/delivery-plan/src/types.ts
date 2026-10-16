@@ -6,6 +6,17 @@
 export interface DeliveryPlan {
   milestones: Milestone[];
   deliverables: Deliverable[];
+  /** Extra columns a project adds to its plan, e.g. Package or Reviewer. */
+  fields?: CustomField[];
+}
+
+/** An extra piece of information kept for every deliverable. */
+export interface CustomField {
+  id: string;
+  label: string;
+  type: 'text' | 'number' | 'date' | 'choice';
+  /** The values to choose from, for type choice. */
+  options?: string[];
 }
 
 /** A point in the project when information must be delivered, e.g. a stage gate. */
@@ -30,6 +41,8 @@ export interface Deliverable {
   predecessors?: string[];
   /** What must be delivered at each milestone. At least one. */
   issues: PlannedIssue[];
+  /** Values of the plan's custom fields, by field id. */
+  custom?: Record<string, string>;
 }
 
 /** What a deliverable must look like at a given milestone. */

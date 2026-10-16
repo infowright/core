@@ -1,4 +1,4 @@
-export type { Deliverable, DeliveryPlan, Milestone, PlannedIssue } from './types';
+export type { CustomField, Deliverable, DeliveryPlan, Milestone, PlannedIssue } from './types';
 export {
   resolveDueDate,
   validateDeliveryPlan,

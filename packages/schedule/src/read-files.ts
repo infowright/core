@@ -1,20 +1,11 @@
 import { cellText, normaliseHeader, type SheetInput } from '@infowright/common';
 import { parseScheduleDate } from './dates';
-import { parseScheduleRows, type ParseResult } from './parse-rows';
+import { COLUMNS, parseScheduleRows, type ParseResult } from './parse-rows';
 import type { Activity } from './types';
 
 /** Header names that mark the activity ID column in a spreadsheet export. */
-const ID_HEADERS = ['activityid', 'taskcode', 'activitycode', 'uniqueid', 'id'];
-const OTHER_HEADERS = [
-  'activityname',
-  'taskname',
-  'name',
-  'start',
-  'finish',
-  'startdate',
-  'finishdate',
-  'enddate',
-];
+const ID_HEADERS: readonly string[] = COLUMNS.id;
+const OTHER_HEADERS: readonly string[] = [...COLUMNS.name, ...COLUMNS.start, ...COLUMNS.finish];
 const HEADER_SEARCH_ROWS = 30;
 
 function addUnique(
@@ -206,4 +197,59 @@ export function parseMsProjectXml(content: string): ParseResult {
 
   if (activities.length === 0) problems.push('No tasks found in the Microsoft Project file.');
   return { schedule: { activities }, problems };
+}
+
+/**
+ * Reads a Primavera P6 export in XML format (File, Export, Primavera PM XML). Uses each
+ * activity's ID, name and dates: actual where started or finished, otherwise the current
+ * forecast, otherwise the planned dates. WBS summary activities are left out.
+ */
+export function parseP6Xml(content: string): ParseResult {
+  const activities: Activity[] = [];
+  const seen = new Set<string>();
+  const problems: string[] = [];
+  if (!/<APIBusinessObjects[\s>]/.test(content)) {
+    problems.push('No activities found. The file does not look like a Primavera P6 XML export.');
+    return { schedule: { activities }, problems };
+  }
+  for (const match of content.matchAll(/<Activity>([\s\S]*?)<\/Activity>/g)) {
+    // Codes, notes and user fields nest their own values, so drop them first.
+    const body = (match[1] ?? '').replace(
+      /<(Code|UDF|Note|ActivityNote|ActivityCode)>[\s\S]*?<\/\1>/g,
+      '',
+    );
+    const field = (name: string) => {
+      const value = new RegExp(`<${name}>([\\s\\S]*?)</${name}>`).exec(body)?.[1];
+      return value === undefined ? undefined : decode(value.trim());
+    };
+    if (/wbs summary/i.test(field('Type') ?? '')) continue;
+    const id = field('Id');
+    if (!id) continue;
+    const date = (name: string) => {
+      const value = field(name);
+      return value ? parseScheduleDate(value)?.date : undefined;
+    };
+    const actualStart = date('ActualStartDate');
+    const actualFinish = date('ActualFinishDate');
+    const activity: Activity = {
+      id,
+      name: field('Name') ?? '',
+      startActual: actualStart !== undefined,
+      finishActual: actualFinish !== undefined,
+    };
+    const start = actualStart ?? date('StartDate') ?? date('PlannedStartDate');
+    const finish = actualFinish ?? date('FinishDate') ?? date('PlannedFinishDate');
+    if (start) activity.start = start;
+    if (finish) activity.finish = finish;
+    addUnique(activities, seen, problems, [activity], 'XML');
+  }
+  if (activities.length === 0) problems.push('No activities found in the Primavera P6 XML file.');
+  return { schedule: { activities }, problems };
+}
+
+/** Reads a programme saved as XML: Primavera P6 XML or Microsoft Project XML. */
+export function parseProgrammeXml(content: string): ParseResult {
+  return /<APIBusinessObjects[\s>]/.test(content.slice(0, 2000))
+    ? parseP6Xml(content)
+    : parseMsProjectXml(content);
 }

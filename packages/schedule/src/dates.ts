@@ -1,4 +1,4 @@
-import { isIsoDate, toIsoDate } from '@infowright/common';
+import { toIsoDate } from '@infowright/common';
 
 export interface ScheduleDate {
   /** YYYY-MM-DD */
@@ -30,12 +30,16 @@ function fromExcelSerial(serial: number): string | undefined {
 }
 
 /**
- * Reads a date cell from a programme export.
- * Understands Excel dates, Excel serial numbers, YYYY-MM-DD (with or without time)
- * and the Primavera P6 style "23-Mar-26", including the "A" (actual) and "*" (constraint) markers.
- * Returns undefined for empty or unrecognised values.
+ * Reads a date cell from a programme or CDE export.
+ * Understands Excel dates and serial numbers, YYYY-MM-DD with or without a time or time zone,
+ * 23/03/2026 and 03/23/2026 (see DateOptions), 23.03.26, the Primavera P6 style "23-Mar-26",
+ * "23 March 2026", "Mar 23, 2026 3:24 PM" and a leading weekday, including the "A" (actual) and
+ * "*" (constraint) markers. Returns undefined for empty or unrecognised values.
  */
-export function parseScheduleDate(value: unknown): ScheduleDate | undefined {
+export function parseScheduleDate(
+  value: unknown,
+  options: DateOptions = {},
+): ScheduleDate | undefined {
   if (value instanceof Date) {
     if (Number.isNaN(value.getTime())) return undefined;
     // Spreadsheet readers give dates as midnight UTC. Read those in UTC so the day does not
@@ -63,20 +67,84 @@ export function parseScheduleDate(value: unknown): ScheduleDate | undefined {
     text = text.slice(0, -1).trim();
   }
   text = text.replace(/\*$/, '').trim();
+  const date = readDateText(text, options.dayFirst);
+  return date ? { date, actual } : undefined;
+}
 
-  const iso = /^(\d{4}-\d{2}-\d{2})(?:[ T]\d{2}:\d{2}(?::\d{2})?)?$/.exec(text);
-  if (iso?.[1] && isIsoDate(iso[1])) return { date: iso[1], actual };
+export interface DateOptions {
+  /**
+   * How to read 03/04/2026 when the day and month could be either way round. True (the default)
+   * reads 3 April, as in the UK and Europe; false reads March 4, as in the US. Find it for a whole
+   * column with guessDayFirst.
+   */
+  dayFirst?: boolean | undefined;
+}
 
-  const p6 = /^(\d{1,2})-([A-Za-z]{3})-(\d{2}|\d{4})(?:\s+\d{1,2}:\d{2})?$/.exec(text);
-  if (p6) {
-    const [, d, mon, y] = p6;
-    const month = MONTHS[(mon ?? '').toLowerCase()];
-    if (!month || !d || !y) return undefined;
-    const year =
-      y.length === 2 ? (Number(y) < 70 ? 2000 + Number(y) : 1900 + Number(y)) : Number(y);
-    const date = toIsoDate(year, month, Number(d));
-    return date ? { date, actual } : undefined;
+const WEEKDAY = /^(mon|tue|wed|thu|fri|sat|sun)[a-z]*\.?,?\s+/i;
+const TIME =
+  /(?:,?\s+(?:at\s+)?\d{1,2}[:.]\d{2}(?:[:.]\d{2}(?:\.\d+)?)?(?:\s*[ap]\.?m\.?)?(?:\s*(?:[a-z]{2,5}|[+-]\d{2}:?\d{2}|z))?)$/i;
+const NUMERIC = /^(\d{1,2})([./-])(\d{1,2})\2(\d{2}|\d{4})$/;
+
+function year(y: string): number {
+  return y.length === 2 ? (Number(y) < 70 ? 2000 + Number(y) : 1900 + Number(y)) : Number(y);
+}
+
+function month(name: string): number | undefined {
+  return MONTHS[name.slice(0, 3).toLowerCase()];
+}
+
+/** Reads the many ways CDEs and programmes write a date. */
+function readDateText(raw: string, dayFirst: boolean | undefined): string | undefined {
+  // 2026-03-23, 2026-03-23T08:00:00Z, 2026-03-23 08:00:00.000+01:00
+  const iso = /^(\d{4})-(\d{2})-(\d{2})(?:[ T][\d:.]+(?:z|[+-]\d{2}:?\d{2})?)?$/i.exec(raw);
+  if (iso) return toIsoDate(Number(iso[1]), Number(iso[2]), Number(iso[3]));
+
+  const text = raw.replace(WEEKDAY, '').replace(TIME, '').trim();
+
+  // 2026/03/23
+  const ymd = /^(\d{4})[./](\d{1,2})[./](\d{1,2})$/.exec(text);
+  if (ymd) return toIsoDate(Number(ymd[1]), Number(ymd[2]), Number(ymd[3]));
+
+  // 23/03/2026, 03/23/2026, 23.03.26, 23-03-2026
+  const num = NUMERIC.exec(text);
+  if (num) {
+    const a = Number(num[1]);
+    const b = Number(num[3]);
+    const y = year(num[4] ?? '');
+    // A dot is only used day first; otherwise a number over 12 settles it.
+    const first = num[2] === '.' || a > 12 ? true : b > 12 ? false : (dayFirst ?? true);
+    return first ? toIsoDate(y, b, a) : toIsoDate(y, a, b);
   }
 
+  // 23-Mar-26, 23 Mar 2026, 23 March 2026, 23-March-2026
+  const dmy = /^(\d{1,2})(?:st|nd|rd|th)?[\s-]+([a-z]{3,9})\.?[\s,-]+(\d{2}|\d{4})$/i.exec(text);
+  if (dmy) {
+    const m = month(dmy[2] ?? '');
+    return m ? toIsoDate(year(dmy[3] ?? ''), m, Number(dmy[1])) : undefined;
+  }
+
+  // Mar 23, 2026 and March 23 2026
+  const mdy = /^([a-z]{3,9})\.?\s+(\d{1,2})(?:st|nd|rd|th)?,?\s+(\d{4})$/i.exec(text);
+  if (mdy) {
+    const m = month(mdy[1] ?? '');
+    return m ? toIsoDate(Number(mdy[3]), m, Number(mdy[2])) : undefined;
+  }
+  return undefined;
+}
+
+/**
+ * Looks through a column of dates to see which way round day and month are: any first number
+ * over 12 means day first, any second number over 12 means month first. Undefined when every
+ * date could be either.
+ */
+export function guessDayFirst(values: readonly unknown[]): boolean | undefined {
+  for (const value of values) {
+    if (typeof value !== 'string') continue;
+    const text = value.trim().replace(WEEKDAY, '').replace(TIME, '').trim();
+    const num = NUMERIC.exec(text);
+    if (!num || num[2] === '.') continue;
+    if (Number(num[1]) > 12) return true;
+    if (Number(num[3]) > 12) return false;
+  }
   return undefined;
 }

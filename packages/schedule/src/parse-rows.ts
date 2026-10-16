@@ -1,4 +1,4 @@
-import { parseScheduleDate } from './dates';
+import { guessDayFirst, parseScheduleDate } from './dates';
 import type { Activity, Schedule } from './types';
 
 export interface ParseResult {
@@ -10,12 +10,34 @@ export interface ParseResult {
 const normalise = (header: string) => header.toLowerCase().replace(/[^a-z0-9]/g, '');
 
 /** Accepted column headers, in order of preference. Compared without case, spaces or punctuation. */
-const COLUMNS = {
-  id: ['activityid', 'taskcode', 'activitycode', 'uniqueid', 'id'],
-  name: ['activityname', 'taskname', 'name', 'description'],
-  start: ['start', 'startdate', 'plannedstart', 'earlystart'],
-  finish: ['finish', 'finishdate', 'plannedfinish', 'earlyfinish', 'end', 'enddate'],
+export const COLUMNS = {
+  // Microsoft Project shows ID and Unique ID; its XML is read by ID, so ID comes first here too.
+  id: ['activityid', 'taskcode', 'activitycode', 'taskid', 'id', 'uniqueid', 'uniquetaskid'],
+  name: ['activityname', 'taskname', 'name', 'task', 'activity', 'description'],
+  start: [
+    'start',
+    'startdate',
+    'forecaststart',
+    'plannedstart',
+    'plannedstartdate',
+    'earlystart',
+    'earlystartdate',
+  ],
+  finish: [
+    'finish',
+    'finishdate',
+    'forecastfinish',
+    'plannedfinish',
+    'plannedfinishdate',
+    'earlyfinish',
+    'earlyfinishdate',
+    'end',
+    'enddate',
+  ],
 } as const;
+
+/** Cells that mean "no date", e.g. NA in Microsoft Project. */
+const NO_DATE = /^(na|n\/a|nd|-+|tbc|tba|none)$/i;
 
 function findColumn(headers: string[], aliases: readonly string[]): string | undefined {
   for (const alias of aliases) {
@@ -59,6 +81,9 @@ export function parseScheduleRows(rows: readonly Record<string, unknown>[]): Par
 
   const activities: Activity[] = [];
   const seen = new Set<string>();
+  const dayFirst = guessDayFirst(
+    rows.flatMap((r) => [col.start ? r[col.start] : null, col.finish ? r[col.finish] : null]),
+  );
 
   rows.forEach((row, index) => {
     const id = text(row[col.id as string]);
@@ -82,8 +107,8 @@ export function parseScheduleRows(rows: readonly Record<string, unknown>[]): Par
       const column = col[key];
       if (!column) continue;
       const raw = row[column];
-      if (text(raw) === '') continue;
-      const parsed = parseScheduleDate(raw);
+      if (text(raw) === '' || NO_DATE.test(text(raw))) continue;
+      const parsed = parseScheduleDate(raw, { dayFirst });
       if (!parsed) {
         problems.push(`Activity ${id}: could not read ${key} date "${text(raw)}".`);
         continue;

@@ -1,16 +1,14 @@
 /**
  * Splits CSV text into rows of cells. Handles quoted cells with commas, line breaks and
- * doubled quotes. The delimiter (comma, semicolon or tab) is taken from the first line,
- * since European exports often use semicolons.
+ * doubled quotes. The delimiter (comma, semicolon or tab) is the one the first lines use
+ * most, since European exports often use semicolons and pasted lists use tabs. A title line
+ * above the header does not decide it.
  */
 export function parseCsv(text: string): string[][] {
   const content = text.replace(/^\uFEFF/, '');
-  const firstLine = content.split(/\r?\n/, 1)[0] ?? '';
-  const count = (ch: string) => firstLine.split(ch).length - 1;
-  const delimiter = [',', ';', '\t'].reduce(
-    (best, ch) => (count(ch) > count(best) ? ch : best),
-    ',',
-  );
+  const lines = content.split(/\r?\n/, 20);
+  const most = (ch: string) => Math.max(0, ...lines.map((l) => l.split(ch).length - 1));
+  const delimiter = ['\t', ';', ','].reduce((best, ch) => (most(ch) > most(best) ? ch : best), ',');
 
   const rows: string[][] = [];
   let row: string[] = [];

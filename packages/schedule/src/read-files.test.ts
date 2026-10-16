@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseMsProjectXml, parseXer, readScheduleSheets } from './read-files';
+import { parseMsProjectXml, parseProgrammeXml, parseXer, readScheduleSheets } from './read-files';
 
 const XER = [
   'ERMHDR\t21.12\t2026-10-01\tProject\tadmin\tadmin\tdbxDatabaseNoName\tProject Management\tGBP',
@@ -140,5 +140,94 @@ describe('readScheduleSheets', () => {
     expect(readScheduleSheets([{ name: 'S', rows: [['x']] }]).problems[0]).toMatch(
       /^No programme found/,
     );
+  });
+});
+
+describe('parseP6Xml', () => {
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<APIBusinessObjects xmlns="http://xmlns.oracle.com/Primavera/P6/V23.12/API/BusinessObjects">
+  <Project>
+    <Id>DEMO</Id>
+    <Name>Sample</Name>
+    <Activity>
+      <ActualFinishDate>2026-03-20T17:00:00</ActualFinishDate>
+      <ActualStartDate>2026-03-02T08:00:00</ActualStartDate>
+      <FinishDate>2026-03-20T17:00:00</FinishDate>
+      <Id>A1000</Id>
+      <Name>Concept design &amp; review</Name>
+      <PlannedFinishDate>2026-03-18T17:00:00</PlannedFinishDate>
+      <PlannedStartDate>2026-03-02T08:00:00</PlannedStartDate>
+      <StartDate>2026-03-02T08:00:00</StartDate>
+      <Type>Task Dependent</Type>
+      <UDF><TypeObjectId>1</TypeObjectId><TextValue>x</TextValue></UDF>
+    </Activity>
+    <Activity>
+      <FinishDate>2026-06-30T17:00:00</FinishDate>
+      <Id>A1010</Id>
+      <Name>Spatial coordination</Name>
+      <StartDate>2026-04-01T08:00:00</StartDate>
+      <Type>Task Dependent</Type>
+    </Activity>
+    <Activity>
+      <Id>WBS1</Id>
+      <Name>Summary</Name>
+      <Type>WBS Summary</Type>
+    </Activity>
+  </Project>
+</APIBusinessObjects>`;
+  it('reads activities with actual and forecast dates', () => {
+    const { schedule, problems } = parseProgrammeXml(xml);
+    expect(problems).toEqual([]);
+    expect(schedule.activities).toEqual([
+      {
+        id: 'A1000',
+        name: 'Concept design & review',
+        start: '2026-03-02',
+        finish: '2026-03-20',
+        startActual: true,
+        finishActual: true,
+      },
+      {
+        id: 'A1010',
+        name: 'Spatial coordination',
+        start: '2026-04-01',
+        finish: '2026-06-30',
+        startActual: false,
+        finishActual: false,
+      },
+    ]);
+  });
+});
+
+describe('programme spreadsheets from other tools', () => {
+  it('reads a Microsoft Project export by ID, with NA for no actual date', () => {
+    const { schedule, problems } = readScheduleSheets([
+      {
+        name: 'Task_Table1',
+        rows: [
+          ['ID', 'Unique ID', 'Task Name', 'Start', 'Finish', 'Actual Finish'],
+          [1, 101, 'Design', 'Mon 02/03/26', 'Fri 20/03/26', 'NA'],
+          [2, 102, 'Review', '23 March 2026 08:00', '27 March 2026 17:00', 'NA'],
+        ],
+      },
+    ]);
+    expect(problems).toEqual([]);
+    expect(schedule.activities.map((a) => [a.id, a.start, a.finish])).toEqual([
+      ['1', '2026-03-02', '2026-03-20'],
+      ['2', '2026-03-23', '2026-03-27'],
+    ]);
+  });
+  it('reads US dates when the column shows them', () => {
+    const { schedule } = readScheduleSheets([
+      {
+        name: 'Sheet1',
+        rows: [
+          ['Activity ID', 'Activity Name', 'Start', 'Finish'],
+          ['A1', 'One', '03/02/2026', '03/20/2026'],
+        ],
+      },
+    ]);
+    expect(schedule.activities[0]?.start).toBe('2026-03-02');
+    expect(schedule.activities[0]?.finish).toBe('2026-03-20');
   });
 });

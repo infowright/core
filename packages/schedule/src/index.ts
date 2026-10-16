@@ -1,4 +1,10 @@
 export type { Activity, Schedule } from './types';
-export { parseScheduleDate, type ScheduleDate } from './dates';
+export { guessDayFirst, parseScheduleDate, type DateOptions, type ScheduleDate } from './dates';
 export { findActivity, parseScheduleRows, type ParseResult } from './parse-rows';
-export { parseMsProjectXml, parseXer, readScheduleSheets } from './read-files';
+export {
+  parseMsProjectXml,
+  parseP6Xml,
+  parseProgrammeXml,
+  parseXer,
+  readScheduleSheets,
+} from './read-files';

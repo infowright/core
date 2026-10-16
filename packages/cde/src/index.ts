@@ -1,5 +1,10 @@
 export type { Register, RegisterEntry } from './types';
-export { readRegisterSheets, type RegisterImport } from './read-register';
+export {
+  readRegisterSheets,
+  statusFromCell,
+  type RegisterImport,
+  type RegisterSheet,
+} from './read-register';
 export {
   compareWithRegister,
   type CompareOptions,

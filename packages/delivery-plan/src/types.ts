@@ -8,6 +8,26 @@ export interface DeliveryPlan {
   deliverables: Deliverable[];
   /** Extra columns a project adds to its plan, e.g. Package or Reviewer. */
   fields?: CustomField[];
+  /** The responsibility matrix: who produces, accepts, reviews and is informed of what. */
+  responsibilities?: Responsibility[];
+}
+
+/** R produces, A accepts, C reviews (is consulted), I is informed. */
+export type Duty = 'R' | 'A' | 'C' | 'I';
+
+/**
+ * 1 row of the responsibility matrix: a scope of information and each task team's duty for it.
+ * The scope is a discipline (role code), narrowed by a document type or a facility when set.
+ */
+export interface Responsibility {
+  id: string;
+  /** Shown instead of the scope when set, e.g. "Structural models". */
+  label?: string;
+  role?: string;
+  type?: string;
+  facility?: string;
+  /** Duty by task team code. Teams without a duty are left out. */
+  duties: Record<string, Duty>;
 }
 
 /** An extra piece of information kept for every deliverable. */

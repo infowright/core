@@ -1,4 +1,12 @@
-export type { CustomField, Deliverable, DeliveryPlan, Milestone, PlannedIssue } from './types';
+export type {
+  CustomField,
+  Deliverable,
+  DeliveryPlan,
+  Duty,
+  Milestone,
+  PlannedIssue,
+  Responsibility,
+} from './types';
 export {
   resolveDueDate,
   validateDeliveryPlan,
@@ -28,3 +36,12 @@ export {
   type RepeatOptions,
   type RepeatResult,
 } from './locations';
+export {
+  checkResponsibilities,
+  describeScope,
+  DUTIES,
+  inferResponsibilities,
+  scopeOf,
+  type MatrixCheck,
+  type MatrixProblem,
+} from './responsibility';

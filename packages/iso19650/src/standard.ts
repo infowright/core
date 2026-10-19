@@ -10,6 +10,7 @@ import {
   UK_NA_REVISION_SCHEME,
   type RevisionScheme,
 } from './revision-codes';
+import { validateLocations, type LocationBreakdown } from './locations';
 import { getStatusCode, UK_NA_STATUS_CODES, type StatusCodeDefinition } from './status-codes';
 
 /**
@@ -22,6 +23,8 @@ export interface InformationStandard {
   namingConventions: NamingConvention[];
   statusCodes: StatusCodeDefinition[];
   revisions: RevisionScheme;
+  /** Sites, facilities and their parts, and which name fields hold their codes. */
+  locations?: LocationBreakdown;
 }
 
 /** UK National Annex to BS EN ISO 19650-2. A starting point to copy and adjust. */
@@ -208,6 +211,9 @@ export function validateStandard(standard: InformationStandard): string[] {
       problems.push('Versions must have between 1 and 4 digits.');
     }
   }
+
+  if (standard.locations)
+    problems.push(...validateLocations(standard.locations, namingConventions));
 
   return problems;
 }

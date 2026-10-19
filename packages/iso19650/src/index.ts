@@ -45,3 +45,18 @@ export {
   validateStandard,
   type InformationStandard,
 } from './standard';
+export {
+  FACILITY_KINDS,
+  formatChainage,
+  inferLocations,
+  locate,
+  NO_LOCATION,
+  validateLocations,
+  type Facility,
+  type FacilityKind,
+  type FacilityKindInfo,
+  type LocationBreakdown,
+  type LocationPart,
+  type Located,
+  type Site,
+} from './locations';

@@ -1,6 +1,6 @@
 import { UK_NATIONAL_ANNEX } from '@infowright/iso19650';
 import { describe, expect, it } from 'vitest';
-import { buildingFields, buildingOf, repeatForBuildings } from './buildings';
+import { fieldOf, planLocations, repeatForFacilities } from './locations';
 import type { DeliveryPlan } from './types';
 
 const plan: DeliveryPlan = {
@@ -46,17 +46,17 @@ const schedule = {
   })),
 };
 
-describe('buildings', () => {
-  it('finds the field that tells buildings apart, ignoring ZZ', () => {
-    expect(buildingFields(plan, UK_NATIONAL_ANNEX)).toEqual([
-      { key: 'volume', label: 'Volume/System', values: ['B1', 'B2'] },
+describe('locations', () => {
+  it('lists the facilities and parts used in the plan, ignoring ZZ', () => {
+    expect(planLocations(plan, UK_NATIONAL_ANNEX).facilities.map((f) => f.code)).toEqual([
+      'B1',
+      'B2',
     ]);
-    expect(buildingOf(plan.deliverables[0]!, 'volume', UK_NATIONAL_ANNEX)).toBe('B1');
+    expect(fieldOf(plan.deliverables[0]!, 'volume', UK_NATIONAL_ANNEX)).toBe('B1');
   });
 
   it('repeats a building for others, renaming, linking the same activity and skipping what exists', () => {
-    const result = repeatForBuildings(plan, {
-      field: 'volume',
+    const result = repeatForFacilities(plan, {
       from: 'B1',
       to: ['B2', 'b3', 'B1'],
       standard: UK_NATIONAL_ANNEX,

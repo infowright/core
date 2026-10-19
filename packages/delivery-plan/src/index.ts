@@ -22,10 +22,9 @@ export {
   type SuggestOptions,
 } from './suggest-links';
 export {
-  buildingFields,
-  buildingOf,
-  repeatForBuildings,
-  type BuildingField,
+  fieldOf,
+  planLocations,
+  repeatForFacilities,
   type RepeatOptions,
   type RepeatResult,
-} from './buildings';
+} from './locations';

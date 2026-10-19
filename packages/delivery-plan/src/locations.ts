@@ -1,18 +1,20 @@
-import { checkName, type InformationStandard } from '@infowright/iso19650';
+import {
+  checkName,
+  inferLocations,
+  type InformationStandard,
+  type LocationBreakdown,
+} from '@infowright/iso19650';
 import type { Schedule } from '@infowright/schedule';
 import type { Deliverable, DeliveryPlan } from './types';
 
 /*
- * Projects with repeated buildings: a campus, an estate, a set of schools. The building is read
- * from a field of the container name, usually Volume/System (B1, B2 ...). A plan made for 1
- * building can be repeated for the others, and progress compared building by building.
+ * Plans laid out by location: the facilities of a project (buildings, bridges, roads, railways)
+ * and their parts, read from the container names. A plan made for 1 facility can be repeated
+ * for the others, e.g. the buildings of a campus or the bridges of a road scheme.
  */
 
-/** Codes that mean "no particular building" in ISO 19650 names. */
-const NOT_A_BUILDING = new Set(['ZZ', 'XX', '00']);
-
-/** The value of the building field in a deliverable's name, if the name can be read. */
-export function buildingOf(
+/** The value of a name field of a deliverable, e.g. its facility code, if the name can be read. */
+export function fieldOf(
   d: Deliverable,
   field: string,
   standard: InformationStandard,
@@ -22,46 +24,18 @@ export function buildingOf(
   return value ? value.toUpperCase() : undefined;
 }
 
-export interface BuildingField {
-  key: string;
-  label: string;
-  /** Distinct values, e.g. B1, B2, B3, most used first. */
-  values: string[];
-}
-
 /**
- * Name fields that could identify buildings: fields with at least 2 values that are not
- * ZZ or XX, excluding the project, originator, type, role and number. Volume first.
+ * The project's locations, completed with every facility and part code used in the plan, so
+ * nothing in the plan is left out even before the breakdown is set up.
  */
-export function buildingFields(plan: DeliveryPlan, standard: InformationStandard): BuildingField[] {
-  const skip = new Set(['project', 'originator', 'type', 'role', 'number']);
-  const counts = new Map<string, Map<string, number>>();
-  const labels = new Map<string, string>();
-  for (const convention of standard.namingConventions) {
-    for (const f of convention.fields) if (!skip.has(f.key)) labels.set(f.key, f.label);
-  }
-  for (const d of plan.deliverables) {
-    if (!d.containerName) continue;
-    const values = checkName(d.containerName, standard)?.result.values ?? {};
-    for (const [key, raw] of Object.entries(values)) {
-      if (!labels.has(key)) continue;
-      const value = raw.toUpperCase();
-      if (!value || NOT_A_BUILDING.has(value)) continue;
-      const byValue = counts.get(key) ?? new Map<string, number>();
-      byValue.set(value, (byValue.get(value) ?? 0) + 1);
-      counts.set(key, byValue);
-    }
-  }
-  return [...counts.entries()]
-    .filter(([, byValue]) => byValue.size >= 2)
-    .map(([key, byValue]) => ({
-      key,
-      label: labels.get(key) ?? key,
-      values: [...byValue.entries()]
-        .sort((a, b) => a[0].localeCompare(b[0], 'en', { numeric: true }))
-        .map(([v]) => v),
-    }))
-    .sort((a, b) => (a.key === 'volume' ? -1 : b.key === 'volume' ? 1 : 0));
+export function planLocations(
+  plan: DeliveryPlan,
+  standard: InformationStandard,
+): LocationBreakdown {
+  const names = plan.deliverables.map((d) => d.containerName ?? '').filter(Boolean);
+  return inferLocations(names, standard.namingConventions, {
+    ...(standard.locations ? { previous: standard.locations } : {}),
+  });
 }
 
 /** The name with 1 field replaced, keeping the delimiter and the other fields. */
@@ -80,15 +54,16 @@ function replaceField(
 }
 
 export interface RepeatOptions {
-  field: string;
-  /** The building whose deliverables are copied, e.g. B1. */
+  /** The name field with the facility code. Defaults to the project's facility field. */
+  field?: string;
+  /** The facility whose deliverables are copied, e.g. B1. */
   from: string;
-  /** The buildings to copy them to, e.g. B2, B3. */
+  /** The facilities to copy them to, e.g. B2, B3. */
   to: string[];
   standard: InformationStandard;
   /** Used to find the same activity for the new building, e.g. ARC-B1-S3 becomes ARC-B2-S3. */
   schedule?: Schedule | null;
-  /** Days each later building runs behind the one before it, for staggered buildings. */
+  /** Days each later facility runs behind the one before it, when they are built in turn. */
   shiftDays?: number;
 }
 
@@ -123,15 +98,16 @@ function activityFor(
   return schedule.activities.some((a) => a.id === swapped) ? swapped : undefined;
 }
 
-/** Copies the deliverables of 1 building to others, renaming the building field. */
-export function repeatForBuildings(plan: DeliveryPlan, options: RepeatOptions): RepeatResult {
-  const { field, standard, schedule } = options;
+/** Copies the deliverables of 1 facility to others, changing the facility code in the names. */
+export function repeatForFacilities(plan: DeliveryPlan, options: RepeatOptions): RepeatResult {
+  const { standard, schedule } = options;
+  const field = options.field ?? standard.locations?.facilityField ?? 'volume';
   const from = options.from.toUpperCase();
   const existing = new Set(
     plan.deliverables.map((d) => (d.containerName ?? '').toUpperCase()).filter(Boolean),
   );
   const ids = new Set(plan.deliverables.map((d) => d.id));
-  const source = plan.deliverables.filter((d) => buildingOf(d, field, standard) === from);
+  const source = plan.deliverables.filter((d) => fieldOf(d, field, standard) === from);
 
   const added: Deliverable[] = [];
   const skipped: string[] = [];

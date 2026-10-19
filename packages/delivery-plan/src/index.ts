@@ -13,3 +13,11 @@ export {
   type SheetSummary,
 } from './read-sheets';
 export { compareWithProgramme, type ProgrammeCheck } from './programme';
+export {
+  applyActivityLinks,
+  STRONG_LINK,
+  suggestActivityLinks,
+  type LinkCandidate,
+  type LinkSuggestion,
+  type SuggestOptions,
+} from './suggest-links';
